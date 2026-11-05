@@ -3,24 +3,29 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AIM RANGE</title>
-  <!-- Three.js r128 from cdnjs -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <title>VALORANT AIM RANGE - Tactical Aim Trainer</title>
+
   <!-- Google Fonts: Archivo & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700;800;900&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,300..900;1,300..900&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Three.js r128 from cdnjs -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
   <style>
     :root {
       --bg: #0e0d0b;
       --surface: #161512;
+      --surface-elevated: #1f1d19;
       --hairline: #2a2823;
+      --hairline-light: #3a3731;
       --text: #ece7dc;
       --muted: #8b857a;
       --accent-1: #ff5b2e;
       --accent-2: #5fd3b4;
-      --font-heading: 'Archivo', -apple-system, BlinkMacSystemFont, sans-serif;
-      --font-mono: 'JetBrains Mono', monospace;
+      --gold: #ffd700;
+      --blue: #38bdf8;
     }
 
     * {
@@ -28,21 +33,17 @@
       margin: 0;
       padding: 0;
       user-select: none;
+      -webkit-user-select: none;
     }
 
-    body, html {
+    html, body {
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: var(--bg);
-      font-family: var(--font-heading);
+      background-color: var(--bg);
       color: var(--text);
-    }
-
-    /* Accessibility Focus-Visible */
-    *:focus-visible {
-      outline: 2px solid var(--accent-1);
-      outline-offset: 2px;
+      font-family: 'Archivo', sans-serif;
+      font-size: 13px;
     }
 
     #game-canvas {
@@ -55,173 +56,252 @@
       z-index: 1;
     }
 
-    /* Crosshair DOM Overlay */
+    /* Fixed Crosshair DOM Canvas Overlay */
     #crosshair-container {
       position: fixed;
       top: 50%;
       left: 50%;
-      transform: translate(-50%, -50%);
       width: 120px;
       height: 120px;
+      transform: translate(-50%, -50%);
       pointer-events: none;
-      z-index: 20;
+      z-index: 50;
       display: flex;
       align-items: center;
       justify-content: center;
     }
 
     #crosshair-canvas {
-      display: block;
+      width: 120px;
+      height: 120px;
+      image-rendering: pixelated;
     }
 
-    /* Hit Confirmation Marker */
+    /* Hitmarker */
     #hit-marker {
       position: fixed;
       top: 50%;
       left: 50%;
-      transform: translate(-50%, -50%);
       width: 16px;
       height: 16px;
+      transform: translate(-50%, -50%);
       pointer-events: none;
-      z-index: 21;
+      z-index: 55;
       opacity: 0;
-      transition: opacity 0.06s ease-out;
+      transition: opacity 0.05s ease-out;
     }
+
     #hit-marker::before, #hit-marker::after {
       content: '';
       position: absolute;
-      background: var(--accent-2);
+      background: #ff2a4b;
     }
-    #hit-marker::before { top: 7px; left: 0; width: 16px; height: 2px; }
-    #hit-marker::after { top: 0; left: 7px; width: 2px; height: 16px; }
 
-    /* HUD (Top Left, Center, Right) */
-    #hud {
-      position: absolute;
-      top: 24px;
-      left: 32px;
-      right: 32px;
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
+    #hit-marker::before {
+      top: 7px; left: 0; width: 16px; height: 2px;
+    }
+
+    #hit-marker::after {
+      top: 0; left: 7px; width: 2px; height: 16px;
+    }
+
+    /* Pre-created Floating Score Popups */
+    .score-popup {
+      position: fixed;
       pointer-events: none;
-      z-index: 10;
+      z-index: 60;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95), 0 0 2px #000;
+      transform: translate(-50%, -50%);
+      white-space: nowrap;
     }
 
-    .hud-block {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .hud-label {
-      font-size: 11px;
+    /* Panic Warning Banner */
+    #panic-warning-banner {
+      position: fixed;
+      top: 36px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 80;
+      background: rgba(22, 21, 18, 0.95);
+      border: 1px solid var(--accent-1);
+      color: var(--accent-1);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
       font-weight: 700;
       letter-spacing: 1px;
       text-transform: uppercase;
+      padding: 10px 24px;
+      pointer-events: none;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    #panic-warning-banner.visible {
+      opacity: 1;
+    }
+
+    /* Minimal In-Game HUD */
+    #hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 28px 36px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .hud-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .hud-stat-box {
+      background: rgba(22, 21, 18, 0.85);
+      border: 1px solid var(--hairline);
+      padding: 10px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .hud-label {
+      font-size: 10px;
+      font-weight: 600;
       color: var(--muted);
-      margin-bottom: 2px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
     }
 
-    .hud-num {
-      font-family: var(--font-mono);
-      font-size: 28px;
-      font-weight: 700;
+    .hud-val {
+      font-size: 22px;
+      font-weight: 800;
       color: var(--text);
-      letter-spacing: -0.5px;
     }
 
-    .hud-num.accent {
+    .hud-val.accent {
       color: var(--accent-1);
     }
 
-    /* Weapon Indicator (Bottom-Right, Name only) */
-    #weapon-indicator {
-      position: absolute;
-      bottom: 24px;
-      right: 32px;
-      font-size: 14px;
-      font-weight: 800;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      color: var(--muted);
-      pointer-events: none;
-      z-index: 10;
+    .hud-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
     }
 
-    /* Fullscreen Overlay Screens (Start, Pause, Results) */
+    .hud-weapon-tag {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      background: rgba(22, 21, 18, 0.85);
+      border: 1px solid var(--hairline);
+      padding: 8px 16px;
+    }
+
+    /* Screen Overlays */
     .screen-overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: var(--bg);
+      position: fixed;
+      inset: 0;
+      background: rgba(14, 13, 11, 0.94);
       z-index: 100;
-      overflow-y: auto;
       display: flex;
-      flex-direction: column;
+      backdrop-filter: blur(2px);
+      overflow-y: auto;
     }
 
     .screen-overlay.hidden {
-      display: none;
+      display: none !important;
     }
 
-    /* Start Screen Asymmetric Layout */
+    /* Asymmetric Start Screen Layout */
     .start-layout {
       width: 100%;
-      max-width: 1360px;
+      max-width: 1440px;
       margin: 0 auto;
-      padding: 56px 48px;
+      padding: 48px;
       display: grid;
-      grid-template-columns: 1fr 420px;
-      gap: 64px;
-      align-items: start;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 48px;
+      min-height: 100%;
+      align-items: stretch;
     }
 
     /* Left Column */
-    .hero-title {
-      font-size: 88px;
-      font-weight: 900;
-      letter-spacing: -3px;
-      line-height: 0.9;
-      color: var(--text);
-      text-transform: uppercase;
-      margin-bottom: 24px;
+    .left-col {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
     }
 
-    .hero-title span {
-      color: var(--accent-1);
+    .hero-title-area {
+      margin-bottom: 32px;
+    }
+
+    .main-title {
+      font-size: 80px;
+      font-weight: 900;
+      line-height: 0.92;
+      letter-spacing: -2.5px;
+      text-transform: uppercase;
+      color: var(--text);
+      margin-bottom: 12px;
+    }
+
+    .sub-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 2px;
+      text-transform: uppercase;
     }
 
     .btn-start-run {
       background: var(--accent-1);
       color: #0e0d0b;
       border: none;
-      padding: 18px 40px;
-      font-size: 16px;
-      font-weight: 800;
-      letter-spacing: 1px;
+      font-family: 'Archivo', sans-serif;
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: 1.5px;
       text-transform: uppercase;
+      padding: 22px 48px;
       cursor: pointer;
-      display: inline-block;
-      transition: background 0.12s, transform 0.1s;
-      margin-bottom: 48px;
+      width: 100%;
+      text-align: left;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background 0.15s ease, transform 0.1s ease;
+      margin-bottom: 36px;
     }
 
     .btn-start-run:hover {
       background: #ff724a;
-      transform: translateY(-1px);
     }
 
     .btn-start-run:active {
-      transform: translateY(1px);
+      transform: scale(0.995);
     }
 
-    /* Recent Runs Table */
-    .history-section {
-      width: 100%;
-      border-top: 1px solid var(--hairline);
-      padding-top: 24px;
+    /* Run History Table */
+    .history-card {
+      border: 1px solid var(--hairline);
+      background: var(--surface);
+      padding: 20px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
     }
 
     .history-header {
@@ -229,265 +309,364 @@
       justify-content: space-between;
       align-items: center;
       margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--hairline);
     }
 
     .history-title {
-      font-size: 13px;
-      font-weight: 800;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 700;
       letter-spacing: 1.5px;
       text-transform: uppercase;
-      color: var(--muted);
+      color: var(--text);
     }
 
     .btn-clear-history {
       background: none;
-      border: none;
+      border: 1px solid var(--hairline);
       color: var(--muted);
-      font-size: 12px;
-      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      padding: 4px 8px;
       cursor: pointer;
-      text-decoration: underline;
-      padding: 4px;
+      text-transform: uppercase;
     }
 
     .btn-clear-history:hover {
-      color: var(--accent-1);
+      color: var(--text);
+      border-color: var(--muted);
     }
 
     .history-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
     }
 
     .history-table th {
       text-align: left;
-      padding: 8px 10px;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 1px;
-      text-transform: uppercase;
       color: var(--muted);
+      font-weight: 600;
+      padding: 8px 6px;
       border-bottom: 1px solid var(--hairline);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
     .history-table td {
-      padding: 10px 10px;
-      border-bottom: 1px solid var(--hairline);
+      padding: 9px 6px;
+      border-bottom: 1px solid rgba(42, 40, 35, 0.4);
       color: var(--text);
-      font-family: var(--font-mono);
-      font-size: 12px;
     }
 
-    .history-table td.primary-col {
-      color: var(--accent-1);
+    .history-table tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .primary-col {
+      color: var(--accent-1) !important;
       font-weight: 700;
     }
 
-    /* Right Column (Settings List separated by hairlines) */
+    /* Right Column: Settings list */
     .settings-list {
+      background: var(--surface);
+      border: 1px solid var(--hairline);
+      padding: 24px;
       display: flex;
       flex-direction: column;
+      overflow-y: auto;
+      max-height: calc(100vh - 96px);
     }
 
     .setting-item {
+      padding: 16px 0;
       border-bottom: 1px solid var(--hairline);
-      padding: 18px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
     }
 
     .setting-item:first-child {
       padding-top: 0;
     }
 
+    .setting-item:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
     .setting-label {
+      font-family: 'JetBrains Mono', monospace;
       font-size: 11px;
-      font-weight: 800;
-      letter-spacing: 1.5px;
+      font-weight: 700;
       text-transform: uppercase;
+      letter-spacing: 1px;
       color: var(--muted);
-      margin-bottom: 10px;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
 
-    /* Segmented Control */
+    .cm360-val {
+      color: var(--accent-2);
+      font-weight: 700;
+    }
+
+    /* Segmented Controls */
     .segmented-control {
       display: flex;
-      background: var(--surface);
       border: 1px solid var(--hairline);
-      padding: 2px;
-      gap: 2px;
+      background: var(--bg);
+      gap: 1px;
     }
 
     .btn-segment {
       flex: 1;
-      background: transparent;
+      background: var(--surface);
       border: none;
       color: var(--muted);
-      padding: 8px 12px;
+      font-family: 'Archivo', sans-serif;
       font-size: 12px;
       font-weight: 700;
-      letter-spacing: 0.5px;
       text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 10px 8px;
       cursor: pointer;
-      transition: color 0.12s, background 0.12s;
+      transition: all 0.12s ease;
+      text-align: center;
     }
 
     .btn-segment:hover {
       color: var(--text);
+      background: var(--surface-elevated);
     }
 
     .btn-segment.active {
-      background: var(--hairline);
-      color: var(--text);
+      background: var(--text);
+      color: var(--bg);
+      font-weight: 800;
     }
 
-    /* Map Vertical List with Accent Underline */
-    .map-list {
+    /* Map Selection List */
+    .map-list-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .map-item-card {
+      background: var(--bg);
+      border: 1px solid var(--hairline);
+      color: var(--text);
+      padding: 8px 10px;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.12s ease;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 2px;
     }
 
-    .map-item {
-      background: transparent;
-      border: none;
-      color: var(--muted);
-      text-align: left;
-      font-size: 14px;
-      font-weight: 700;
-      padding: 8px 0;
-      cursor: pointer;
-      position: relative;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      transition: color 0.12s;
+    .map-item-card:hover {
+      border-color: var(--muted);
+      background: var(--surface-elevated);
     }
 
-    .map-item:hover {
-      color: var(--text);
+    .map-item-card.active {
+      border-color: var(--accent-1);
+      background: #1e1b17;
+      box-shadow: inset 0 -2px 0 0 var(--accent-1);
     }
 
-    .map-item.active {
-      color: var(--text);
-    }
-
-    .map-item.active::after {
-      content: '';
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      width: 100%;
-      height: 2px;
-      background: var(--accent-1);
-    }
-
-    .map-item .map-desc {
+    .map-card-name {
+      font-family: 'Archivo', sans-serif;
       font-size: 11px;
-      font-weight: 400;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .map-card-desc {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
       color: var(--muted);
     }
 
-    /* Inputs & Sliders */
+    /* Sliders and Num Inputs */
     .num-row {
       display: flex;
-      justify-content: space-between;
       align-items: center;
       gap: 12px;
-      margin-top: 6px;
     }
 
     input[type="range"] {
-      -webkit-appearance: none;
       flex: 1;
-      height: 3px;
+      height: 4px;
       background: var(--hairline);
       outline: none;
+      -webkit-appearance: none;
+      cursor: pointer;
     }
 
     input[type="range"]::-webkit-slider-thumb {
       -webkit-appearance: none;
       width: 14px;
       height: 14px;
+      background: var(--text);
       border-radius: 0;
-      background: var(--accent-1);
       cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      background: var(--accent-1);
     }
 
     .input-mono {
-      width: 68px;
-      background: var(--surface);
+      background: var(--bg);
       border: 1px solid var(--hairline);
-      padding: 5px 8px;
       color: var(--text);
-      font-family: var(--font-mono);
-      font-size: 13px;
-      text-align: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      padding: 6px 8px;
+      width: 72px;
+      text-align: right;
     }
 
-    .cm360-val {
-      font-family: var(--font-mono);
-      font-size: 13px;
-      color: var(--accent-2);
-      font-weight: 700;
+    .input-mono:focus {
+      outline: none;
+      border-color: var(--accent-1);
     }
 
-    /* Custom Switch Toggle */
+    /* Switches */
     .switch-toggle {
       position: relative;
+      display: inline-block;
       width: 36px;
       height: 18px;
-      display: inline-block;
     }
-    .switch-toggle input { opacity: 0; width: 0; height: 0; }
+
+    .switch-toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
     .switch-track {
       position: absolute;
+      inset: 0;
+      background-color: var(--hairline);
       cursor: pointer;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: var(--hairline);
       transition: 0.15s;
     }
-    .switch-track::before {
+
+    .switch-track:before {
       position: absolute;
       content: "";
       height: 12px;
       width: 12px;
       left: 3px;
       bottom: 3px;
-      background: var(--text);
+      background-color: var(--muted);
       transition: 0.15s;
     }
-    .switch-toggle input:checked + .switch-track {
-      background: var(--accent-1);
+
+    input:checked + .switch-track {
+      background-color: var(--accent-2);
     }
-    .switch-toggle input:checked + .switch-track::before {
+
+    input:checked + .switch-track:before {
       transform: translateX(18px);
-      background: #0e0d0b;
+      background-color: #0e0d0b;
+    }
+
+    /* Target & Crosshair Color Presets Row */
+    .color-preset-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .color-swatch-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      cursor: pointer;
+      padding: 0;
+      outline: none;
+      box-sizing: border-box;
+      transition: transform 0.15s ease, border-color 0.15s ease;
+    }
+
+    .color-swatch-btn:hover {
+      transform: scale(1.18);
+    }
+
+    .color-swatch-btn.active {
+      border-color: #ffffff;
+      transform: scale(1.18);
+      box-shadow: 0 0 0 1px #000000;
+    }
+
+    /* Preset Pill Grid */
+    .preset-pill-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .btn-preset-pill {
+      background: var(--surface-elevated);
+      border: 1px solid var(--hairline);
+      color: var(--text);
+      font-family: 'Archivo', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 7px 4px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.12s ease;
+    }
+
+    .btn-preset-pill:hover {
+      border-color: var(--text);
+      background: #25221d;
     }
 
     .btn-sheet-trigger {
-      background: var(--surface);
+      background: var(--surface-elevated);
       border: 1px solid var(--hairline);
       color: var(--text);
-      width: 100%;
       padding: 12px 16px;
-      text-align: left;
-      font-size: 13px;
-      font-weight: 700;
+      font-family: 'Archivo', sans-serif;
+      font-weight: 800;
+      font-size: 12px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
       cursor: pointer;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      transition: border-color 0.12s;
+      width: 100%;
+      transition: background 0.15s ease, border-color 0.15s ease;
     }
 
     .btn-sheet-trigger:hover {
-      border-color: var(--accent-1);
+      background: #23201b;
+      border-color: var(--text);
     }
 
-    /* Side Sheet for Crosshair */
+    /* Slide-out Crosshair Sheet */
     #crosshair-sheet {
       position: fixed;
       top: 0;
@@ -496,13 +675,15 @@
       height: 100%;
       background: var(--surface);
       border-left: 1px solid var(--hairline);
-      z-index: 200;
-      transform: translateX(100%);
-      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 120;
+      padding: 32px;
       display: flex;
       flex-direction: column;
+      gap: 16px;
+      transform: translateX(100%);
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
       overflow-y: auto;
-      padding: 32px;
+      box-shadow: -8px 0 32px rgba(0, 0, 0, 0.7);
     }
 
     #crosshair-sheet.open {
@@ -513,195 +694,311 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding-bottom: 20px;
       border-bottom: 1px solid var(--hairline);
-      margin-bottom: 20px;
+      padding-bottom: 16px;
     }
 
     .sheet-title {
-      font-size: 16px;
-      font-weight: 800;
-      letter-spacing: 1px;
+      font-size: 20px;
+      font-weight: 900;
       text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
     .btn-close-sheet {
       background: none;
-      border: none;
-      color: var(--muted);
-      font-size: 20px;
-      cursor: pointer;
+      border: 1px solid var(--hairline);
+      color: var(--text);
+      font-size: 18px;
       line-height: 1;
+      width: 32px;
+      height: 32px;
+      cursor: pointer;
     }
 
     .btn-close-sheet:hover {
-      color: var(--text);
+      border-color: var(--text);
     }
 
     .code-import-row {
       display: flex;
       gap: 8px;
-      margin-bottom: 6px;
     }
 
     .code-input {
       flex: 1;
       background: var(--bg);
       border: 1px solid var(--hairline);
-      padding: 8px 10px;
-      font-family: var(--font-mono);
-      font-size: 11px;
       color: var(--text);
-      outline: none;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      padding: 8px 10px;
     }
 
     .code-input:focus {
+      outline: none;
       border-color: var(--accent-1);
     }
 
     .btn-apply-code {
-      background: var(--hairline);
+      background: var(--surface-elevated);
       border: 1px solid var(--hairline);
       color: var(--text);
-      padding: 8px 14px;
+      font-family: 'Archivo', sans-serif;
       font-size: 11px;
-      font-weight: 700;
+      font-weight: 800;
       text-transform: uppercase;
+      padding: 0 14px;
       cursor: pointer;
     }
 
     .btn-apply-code:hover {
-      background: var(--text);
-      color: var(--bg);
+      border-color: var(--text);
     }
 
     .code-msg {
-      font-size: 11px;
-      font-weight: 600;
-      margin-bottom: 16px;
-      min-height: 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      margin-top: 4px;
     }
 
     /* Results Screen */
     .results-wrap {
       width: 100%;
-      max-width: 1080px;
-      margin: 0 auto;
-      padding: 56px 48px;
+      max-width: 980px;
+      margin: auto;
+      padding: 48px;
       display: flex;
       flex-direction: column;
+      gap: 28px;
     }
 
     .results-hero {
       display: flex;
       align-items: baseline;
-      gap: 24px;
-      margin-bottom: 28px;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--hairline);
+      padding-bottom: 16px;
     }
 
     .res-score-number {
-      font-family: var(--font-mono);
-      font-size: 96px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 88px;
       font-weight: 800;
-      line-height: 0.9;
-      color: var(--accent-1);
-      letter-spacing: -2px;
+      line-height: 1;
+      letter-spacing: -3px;
+      color: var(--text);
     }
 
     .res-rank-tag {
-      font-size: 24px;
-      font-weight: 800;
-      letter-spacing: 1px;
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: 2px;
       text-transform: uppercase;
       color: var(--accent-1);
+      border: 1px solid var(--accent-1);
+      padding: 6px 14px;
     }
 
     .res-stats-strip {
-      display: flex;
-      border-top: 1px solid var(--hairline);
-      border-bottom: 1px solid var(--hairline);
-      padding: 16px 0;
-      margin-bottom: 32px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border: 1px solid var(--hairline);
+      background: var(--surface);
     }
 
     .res-stat-col {
-      flex: 1;
+      padding: 16px 20px;
       border-right: 1px solid var(--hairline);
-      padding: 0 20px;
-    }
-
-    .res-stat-col:first-child {
-      padding-left: 0;
     }
 
     .res-stat-col:last-child {
       border-right: none;
-      padding-right: 0;
     }
 
     .res-stat-lbl {
+      font-family: 'JetBrains Mono', monospace;
       font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
+      font-weight: 600;
       color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
       margin-bottom: 4px;
     }
 
     .res-stat-val {
-      font-family: var(--font-mono);
+      font-family: 'JetBrains Mono', monospace;
       font-size: 18px;
       font-weight: 700;
       color: var(--text);
     }
 
-    /* 30-cell target breakdown */
-    .breakdown-title {
-      font-size: 11px;
+    /* Aim Analysis Card */
+    .analysis-card {
+      border: 1px solid var(--hairline);
+      background: var(--surface);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .analysis-header {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
       font-weight: 800;
       letter-spacing: 1.5px;
       text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 12px;
+      color: var(--accent-2);
+      border-bottom: 1px solid var(--hairline);
+      padding-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
     }
 
-    .target-grid-30 {
+    .analysis-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    .analysis-box {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .analysis-box .box-lbl {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .analysis-box .box-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    /* EDPI Suggestion Box */
+    .edpi-box {
+      background: var(--bg);
+      border: 1px solid var(--hairline-light);
+      padding: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .edpi-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .edpi-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent-1);
+      text-transform: uppercase;
+    }
+
+    .edpi-comparison {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .edpi-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-apply-sens {
+      background: var(--accent-1);
+      color: #0e0d0b;
+      border: none;
+      font-family: 'Archivo', sans-serif;
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 8px 16px;
+      cursor: pointer;
+    }
+
+    .btn-apply-sens:hover {
+      background: #ff724a;
+    }
+
+    .btn-dismiss-sens {
+      background: var(--surface);
+      border: 1px solid var(--hairline);
+      color: var(--text);
+      font-family: 'Archivo', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+
+    .btn-dismiss-sens:hover {
+      border-color: var(--text);
+    }
+
+    /* Target Breakdown Grid */
+    .target-grid-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .target-grid {
       display: grid;
       grid-template-columns: repeat(10, 1fr);
-      gap: 8px;
-      margin-bottom: 40px;
+      gap: 6px;
     }
 
     .grid-cell {
-      height: 48px;
       border: 1px solid var(--hairline);
+      background: var(--bg);
+      padding: 8px 4px;
       display: flex;
       flex-direction: column;
-      justify-content: center;
       align-items: center;
-      font-family: var(--font-mono);
+      gap: 4px;
+      font-family: 'JetBrains Mono', monospace;
       font-size: 10px;
-      background: transparent;
     }
 
     .grid-cell.head {
-      background: var(--accent-2);
-      color: #0e0d0b;
-      border-color: var(--accent-2);
+      background: rgba(255, 215, 0, 0.15);
+      border-color: var(--gold);
+      color: var(--gold);
       font-weight: 700;
     }
 
     .grid-cell.body {
-      background: #48bfe3;
-      color: #0e0d0b;
-      border-color: #48bfe3;
+      background: rgba(95, 211, 180, 0.15);
+      border-color: var(--accent-2);
+      color: var(--accent-2);
       font-weight: 700;
     }
 
     .grid-cell.legs {
-      background: var(--muted);
-      color: #0e0d0b;
-      border-color: var(--muted);
+      background: rgba(56, 189, 248, 0.15);
+      border-color: var(--blue);
+      color: var(--blue);
       font-weight: 700;
     }
 
@@ -746,80 +1043,6 @@
     .btn-results-secondary:hover {
       border-color: var(--text);
     }
-
-    /* Floating Pop-up Scores */
-    .score-popup {
-      position: fixed;
-      pointer-events: none;
-      z-index: 2000;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 15px;
-      font-weight: 800;
-      letter-spacing: 0.5px;
-      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95), 0 0 2px #000;
-      transform: translate(-50%, -50%);
-      user-select: none;
-    }
-
-    /* Target & Crosshair Color Presets Row */
-    .color-preset-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-top: 6px;
-      flex-wrap: wrap;
-    }
-
-    .color-swatch-btn {
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      border: 2px solid transparent;
-      cursor: pointer;
-      padding: 0;
-      outline: none;
-      box-sizing: border-box;
-      transition: transform 0.15s ease, border-color 0.15s ease;
-    }
-
-    .color-swatch-btn:hover {
-      transform: scale(1.18);
-    }
-
-    .color-swatch-btn.active {
-      border-color: #ffffff;
-      transform: scale(1.18);
-      box-shadow: 0 0 0 1px #000000;
-    }
-
-    /* Crosshair Style Presets Grid */
-    .preset-pill-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 6px;
-      margin-top: 6px;
-    }
-
-    .btn-preset-pill {
-      background: var(--surface);
-      border: 1px solid var(--hairline);
-      color: var(--text);
-      font-family: 'Archivo', sans-serif;
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      padding: 8px 4px;
-      cursor: pointer;
-      text-align: center;
-      transition: all 0.15s ease;
-    }
-
-    .btn-preset-pill:hover {
-      border-color: var(--text);
-      background: #201e1a;
-    }
-
   </style>
 </head>
 <body>
@@ -832,58 +1055,76 @@
     <canvas id="crosshair-canvas" width="120" height="120"></canvas>
   </div>
 
-  <!-- Hit Confirmation Marker -->
+  <!-- Hitmarker -->
   <div id="hit-marker"></div>
 
-  <!-- In-Game Minimal HUD -->
+  <!-- Pre-created Score Popups Pool -->
+  <div id="popup-pool"></div>
+
+  <!-- Panic Warning Banner -->
+  <div id="panic-warning-banner">Slow down. Shoot when you see the target.</div>
+
+  <!-- Minimal In-Game HUD -->
   <div id="hud">
-    <div class="hud-block">
-      <div class="hud-label">Score</div>
-      <div class="hud-num accent" id="hud-score">0.000</div>
+    <div class="hud-top">
+      <div class="hud-stat-box">
+        <span class="hud-label">Score</span>
+        <span class="hud-val accent" id="hud-score">0.000</span>
+      </div>
+      <div class="hud-stat-box" style="text-align: center;">
+        <span class="hud-label">Target</span>
+        <span class="hud-val" id="hud-target-idx">1 / 30</span>
+      </div>
+      <div class="hud-stat-box" style="text-align: right;">
+        <span class="hud-label">Misses</span>
+        <span class="hud-val" id="hud-misses">0</span>
+      </div>
     </div>
-    <div class="hud-block" style="align-items: center;">
-      <div class="hud-label">Target</div>
-      <div class="hud-num" id="hud-target-idx">1 / 30</div>
-    </div>
-    <div class="hud-block" style="align-items: flex-end;">
-      <div class="hud-label">Misses</div>
-      <div class="hud-num" id="hud-misses">0</div>
+    <div class="hud-bottom">
+      <div class="hud-weapon-tag" id="weapon-indicator">VANDAL</div>
+      <div style="font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px;">
+        [ESC] Pause / Settings
+      </div>
     </div>
   </div>
-
-  <!-- Bottom-Right Weapon Name Only (No Ammo, No Reload) -->
-  <div id="weapon-indicator">VANDAL</div>
 
   <!-- ================= START SCREEN ================= -->
   <div id="start-overlay" class="screen-overlay">
     <div class="start-layout">
-      <!-- Left Column -->
-      <div class="start-left">
-        <h1 class="hero-title">AIM<br><span>RANGE</span></h1>
-        <button class="btn-start-run" id="btn-start-run" onclick="startRun()">Start Run</button>
+      <!-- Left Column: Title, Primary CTA, Run History -->
+      <div class="left-col">
+        <div class="hero-title-area">
+          <h1 class="main-title">AIM<br>RANGE</h1>
+          <div class="sub-title">Valorant Precision Aim System</div>
+        </div>
 
-        <!-- Recent Runs Table (Last 8 Runs) -->
-        <div class="history-section">
+        <button class="btn-start-run" id="btn-start-run" onclick="startRun()">
+          <span>Start Run (30 Targets)</span>
+          <span>&rarr;</span>
+        </button>
+
+        <!-- Run History Card -->
+        <div class="history-card">
           <div class="history-header">
             <span class="history-title">Recent Runs</span>
-            <button class="btn-clear-history" onclick="confirmClearHistory()">Clear</button>
+            <button class="btn-clear-history" id="btn-clear-history" onclick="confirmClearHistory()">Clear</button>
           </div>
           <table class="history-table">
             <thead>
               <tr>
                 <th>Date</th>
                 <th>Map</th>
+                <th>Dist</th>
                 <th>Mode</th>
-                <th>Weapon</th>
                 <th>Score</th>
                 <th>Hits</th>
-                <th>HS</th>
+                <th>Head</th>
                 <th>Avg React</th>
                 <th>Shots</th>
               </tr>
             </thead>
             <tbody id="history-tbody">
-              <tr><td colspan="9" style="color: var(--muted); text-align: center;">No completed runs yet.</td></tr>
+              <!-- Dynamically populated -->
             </tbody>
           </table>
         </div>
@@ -893,42 +1134,70 @@
       <div class="settings-list">
         <!-- 1. Mode -->
         <div class="setting-item">
-          <div class="setting-label">Mode</div>
+          <div class="setting-label">Mode &amp; Timer</div>
           <div class="segmented-control">
-            <button class="btn-segment" data-mode="easy" onclick="setMode('easy')">Easy</button>
-            <button class="btn-segment active" data-mode="medium" onclick="setMode('medium')">Medium</button>
-            <button class="btn-segment" data-mode="hard" onclick="setMode('hard')">Hard</button>
+            <button class="btn-segment" data-mode="easy" onclick="setMode('easy')">Easy (2.5s)</button>
+            <button class="btn-segment active" data-mode="medium" onclick="setMode('medium')">Medium (1.4s)</button>
+            <button class="btn-segment" data-mode="hard" onclick="setMode('hard')">Hard (0.9s)</button>
           </div>
         </div>
 
-        <!-- 2. Map (List of 5 with accent underline) -->
+        <!-- 2. Distance Option -->
+        <div class="setting-item">
+          <div class="setting-label">Distance</div>
+          <div class="segmented-control">
+            <button class="btn-segment" data-dist="10" onclick="setDistance(10)">10m</button>
+            <button class="btn-segment active" data-dist="20" onclick="setDistance(20)">20m</button>
+            <button class="btn-segment" data-dist="30" onclick="setDistance(30)">30m</button>
+            <button class="btn-segment" data-dist="40" onclick="setDistance(40)">40m</button>
+            <button class="btn-segment" data-dist="50" onclick="setDistance(50)">50m</button>
+          </div>
+        </div>
+
+        <!-- 3. Map (9 choices: 8 Named + Random) -->
         <div class="setting-item">
           <div class="setting-label">Map</div>
-          <div class="map-list">
-            <button class="map-item active" data-map="random" onclick="setMap('random')">
-              <span>Random</span>
-              <span class="map-desc">Procedural layout</span>
-            </button>
-            <button class="map-item" data-map="tieryard" onclick="setMap('tieryard')">
-              <span>Tier Yard</span>
-              <span class="map-desc">Stepped tiers</span>
-            </button>
-            <button class="map-item" data-map="ledgeworks" onclick="setMap('ledgeworks')">
-              <span>Ledge Works</span>
-              <span class="map-desc">Ramps and crates</span>
-            </button>
-            <button class="map-item" data-map="glasshall" onclick="setMap('glasshall')">
-              <span>Glass Hall</span>
-              <span class="map-desc">Pillars and catwalks</span>
-            </button>
-            <button class="map-item" data-map="cratecourt" onclick="setMap('cratecourt')">
-              <span>Crate Court</span>
-              <span class="map-desc">Low cover clusters</span>
-            </button>
+          <div class="map-list-grid">
+            <div class="map-item-card active" data-map="random" onclick="setMap('random')">
+              <span class="map-card-name">Random</span>
+              <span class="map-card-desc">Procedural</span>
+            </div>
+            <div class="map-item-card" data-map="tieryard" onclick="setMap('tieryard')">
+              <span class="map-card-name">Tier Yard</span>
+              <span class="map-card-desc">Steel Blue</span>
+            </div>
+            <div class="map-item-card" data-map="ledgeworks" onclick="setMap('ledgeworks')">
+              <span class="map-card-name">Ledge Works</span>
+              <span class="map-card-desc">Amber</span>
+            </div>
+            <div class="map-item-card" data-map="glasshall" onclick="setMap('glasshall')">
+              <span class="map-card-name">Glass Hall</span>
+              <span class="map-card-desc">Teal Catwalk</span>
+            </div>
+            <div class="map-item-card" data-map="cratecourt" onclick="setMap('cratecourt')">
+              <span class="map-card-name">Crate Court</span>
+              <span class="map-card-desc">Warm Stone</span>
+            </div>
+            <div class="map-item-card" data-map="pillarrange" onclick="setMap('pillarrange')">
+              <span class="map-card-name">Pillar Range</span>
+              <span class="map-card-desc">Slate Purple</span>
+            </div>
+            <div class="map-item-card" data-map="stephaven" onclick="setMap('stephaven')">
+              <span class="map-card-name">Step Haven</span>
+              <span class="map-card-desc">Desert Terraces</span>
+            </div>
+            <div class="map-item-card" data-map="ironbastion" onclick="setMap('ironbastion')">
+              <span class="map-card-name">Iron Bastion</span>
+              <span class="map-card-desc">Gunmetal</span>
+            </div>
+            <div class="map-item-card" data-map="cobaltloft" onclick="setMap('cobaltloft')">
+              <span class="map-card-name">Cobalt Loft</span>
+              <span class="map-card-desc">Midnight Loft</span>
+            </div>
           </div>
         </div>
 
-        <!-- 3. Weapon -->
+        <!-- 4. Weapon -->
         <div class="setting-item">
           <div class="setting-label">Weapon</div>
           <div class="segmented-control">
@@ -938,7 +1207,7 @@
           </div>
         </div>
 
-        <!-- 4. Mouse DPI -->
+        <!-- 5. Mouse DPI -->
         <div class="setting-item">
           <div class="setting-label">Mouse DPI</div>
           <div class="num-row">
@@ -947,7 +1216,7 @@
           </div>
         </div>
 
-        <!-- 5. Sensitivity & cm/360 -->
+        <!-- 6. Sensitivity & cm/360 -->
         <div class="setting-item">
           <div class="setting-label">
             <span>Sensitivity</span>
@@ -959,7 +1228,22 @@
           </div>
         </div>
 
-        <!-- 6. Strafe Toggle -->
+        <!-- 7. Sound Settings -->
+        <div class="setting-item">
+          <div class="setting-label">
+            <span>Sound Effects</span>
+            <label class="switch-toggle">
+              <input type="checkbox" id="sound-toggle" checked onchange="toggleSound(this.checked)">
+              <span class="switch-track"></span>
+            </label>
+          </div>
+          <div class="num-row">
+            <span style="font-size: 11px; color: var(--muted); width: 64px;">Volume</span>
+            <input type="range" id="sound-volume" min="0.0" max="1.0" step="0.05" value="0.60" oninput="onVolumeChange(this.value)">
+          </div>
+        </div>
+
+        <!-- 8. WASD Movement -->
         <div class="setting-item">
           <div class="setting-label">
             <span>WASD Movement</span>
@@ -970,7 +1254,7 @@
           </div>
         </div>
 
-        <!-- 7. Target Color -->
+        <!-- 9. Target Color -->
         <div class="setting-item">
           <div class="setting-label">Target Color</div>
           <div class="color-preset-row">
@@ -984,10 +1268,10 @@
           </div>
         </div>
 
-        <!-- 7. Crosshair Panel Trigger -->
+        <!-- 10. Crosshair Panel Trigger -->
         <div class="setting-item" style="border-bottom: none; padding-bottom: 0;">
           <button class="btn-sheet-trigger" onclick="openCrosshairSheet()">
-            <span>Crosshair Settings &amp; Import</span>
+            <span>Crosshair Settings &amp; Presets</span>
             <span>&rarr;</span>
           </button>
         </div>
@@ -1016,7 +1300,7 @@
         <div class="res-rank-tag" id="res-rank-val">BEGINNER I</div>
       </div>
 
-      <!-- Single Row of Label/Value Pairs Separated by Hairlines -->
+      <!-- Stats Strip -->
       <div class="res-stats-strip">
         <div class="res-stat-col">
           <div class="res-stat-lbl">Hit Points</div>
@@ -1036,14 +1320,49 @@
         </div>
       </div>
 
-      <!-- 30 Target Results Grid -->
-      <div class="breakdown-title">30 Target Run Breakdown</div>
-      <div class="target-grid-30" id="target-grid-cells"></div>
+      <!-- Aim Analysis & EDPI Suggestion Panel -->
+      <div class="analysis-card">
+        <div class="analysis-header">
+          <span>Aim Error &amp; Flick Analysis</span>
+          <span id="analysis-flick-total">0 Flicks Analyzed</span>
+        </div>
+        <div class="analysis-grid">
+          <div class="analysis-box">
+            <span class="box-lbl">Overflicks (Passed)</span>
+            <span class="box-val" id="analysis-overflick-val">0 (0.0%)</span>
+          </div>
+          <div class="analysis-box">
+            <span class="box-lbl">Underflicks (Fell Short)</span>
+            <span class="box-val" id="analysis-underflick-val">0 (0.0%)</span>
+          </div>
+          <div class="analysis-box">
+            <span class="box-lbl">Avg Crosshair Error</span>
+            <span class="box-val" id="analysis-avg-error-val">H: 0.00° / V: 0.00°</span>
+          </div>
+          <div class="analysis-box">
+            <span class="box-lbl">Panic Shooting Events</span>
+            <span class="box-val" id="analysis-panic-val">0</span>
+          </div>
+        </div>
+
+        <!-- EDPI Suggestion Box -->
+        <div class="edpi-box" id="edpi-suggestion-container">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <!-- 30-Target Breakdown Grid -->
+      <div>
+        <div class="target-grid-title">30-Target Run Breakdown</div>
+        <div class="target-grid" id="target-grid-cells">
+          <!-- 30 cells -->
+        </div>
+      </div>
 
       <!-- Actions -->
       <div class="res-actions">
-        <button class="btn-results-primary" onclick="startRun()">Play Again</button>
-        <button class="btn-results-secondary" onclick="quitToMenu()">Menu</button>
+        <button class="btn-results-primary" onclick="restartRun()">Play Again</button>
+        <button class="btn-results-secondary" onclick="quitToMenu()">Main Menu</button>
       </div>
     </div>
   </div>
@@ -1055,7 +1374,7 @@
       <button class="btn-close-sheet" onclick="closeCrosshairSheet()">&times;</button>
     </div>
 
-    <!-- Crosshair Style Presets -->
+    <!-- Style Presets -->
     <div class="setting-item" style="padding-top: 0;">
       <div class="setting-label">Presets</div>
       <div class="preset-pill-grid">
@@ -1068,7 +1387,7 @@
       </div>
     </div>
 
-    <!-- Crosshair Color Presets -->
+    <!-- Color Presets -->
     <div class="setting-item">
       <div class="setting-label">Color Presets</div>
       <div class="color-preset-row">
@@ -1092,9 +1411,9 @@
       <div class="code-msg" id="code-status-msg"></div>
     </div>
 
-    <!-- Color -->
+    <!-- Color & Opacity Slider -->
     <div class="setting-item">
-      <div class="setting-label">Color &amp; Opacity</div>
+      <div class="setting-label">Custom Color &amp; Opacity</div>
       <div class="num-row">
         <input type="color" id="ch-color" value="#00ff88" onchange="updateCrosshair()">
         <input type="range" id="ch-opacity" min="0.1" max="1.0" step="0.05" value="1.0" oninput="updateCrosshair()">
@@ -1175,128 +1494,19 @@
       </div>
     </div>
 
-    <div style="margin-top: 24px;">
-      <button class="btn-apply-code" style="width: 100%; padding: 12px;" onclick="resetCrosshairDefault()">Reset Crosshair</button>
+    <div style="margin-top: 8px;">
+      <button class="btn-results-secondary" style="width: 100%;" onclick="resetCrosshairDefault()">Reset to Default</button>
     </div>
   </div>
 
-  <!-- ================= AUDIO ENGINE ================= -->
+  <!-- ================= JAVASCRIPT GAME ENGINE ================= -->
   <script>
-    const AudioEngine = {
-      ctx: null,
-      init() {
-        if (!this.ctx) {
-          const AC = window.AudioContext || window.webkitAudioContext;
-          if (AC) this.ctx = new AC();
-        }
-        if (this.ctx && this.ctx.state === 'suspended') {
-          this.ctx.resume();
-        }
-      },
-      playGunshot(type) {
-        if (!this.ctx) return;
-        const now = this.ctx.currentTime;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-
-        if (type === 'sheriff') {
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(260, now);
-          osc.frequency.exponentialRampToValueAtTime(32, now + 0.16);
-          gain.gain.setValueAtTime(0.55, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.16);
-        } else if (type === 'guardian') {
-          osc.type = 'sawtooth';
-          osc.frequency.setValueAtTime(360, now);
-          osc.frequency.exponentialRampToValueAtTime(45, now + 0.12);
-          gain.gain.setValueAtTime(0.45, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
-        } else {
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(310, now);
-          osc.frequency.exponentialRampToValueAtTime(38, now + 0.1);
-          gain.gain.setValueAtTime(0.4, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-        }
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.16);
-      },
-      playHit(zone) {
-        if (!this.ctx) return;
-        const now = this.ctx.currentTime;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-
-        if (zone === 'head') {
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(1450, now);
-          osc.frequency.exponentialRampToValueAtTime(1950, now + 0.14);
-          gain.gain.setValueAtTime(0.65, now);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
-        } else {
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(460, now);
-          osc.frequency.exponentialRampToValueAtTime(130, now + 0.12);
-          gain.gain.setValueAtTime(0.5, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
-        }
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.22);
-      },
-      playMiss() {
-        if (!this.ctx) return;
-        const now = this.ctx.currentTime;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(160, now);
-        osc.frequency.exponentialRampToValueAtTime(50, now + 0.08);
-        gain.gain.setValueAtTime(0.15, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.08);
-      }
-    };
-  </script>
-
-  <!-- ================= GAME ENGINE & MAPS ================= -->
-  <script>
-    // --- RANK TIERS ---
-    const RANKS = [
-      { name: 'World Elite', min: 445 },
-      { name: 'Distinguished', min: 360 },
-      { name: 'Professional', min: 295 },
-      { name: 'Talent', min: 240 },
-      { name: 'Competitive', min: 185 },
-      { name: 'Skilled II', min: 140 },
-      { name: 'Skilled I', min: 105 },
-      { name: 'Casual II', min: 80 },
-      { name: 'Casual I', min: 62 },
-      { name: 'Beginner II', min: 40 },
-      { name: 'Beginner I', min: 0 }
-    ];
-
-    function getRank(score) {
-      for (let r of RANKS) {
-        if (score >= r.min) return r;
-      }
-      return RANKS[RANKS.length - 1];
-    }
-
-    // --- GAMEPLAY CONSTANTS ---
+    // --- CONSTANTS & CONFIGURATION ---
     const VALORANT_YAW_FACTOR = 0.07;
-    const HORIZONTAL_BASE_FOV_DEG = 103.0; // Locked 103 deg horizontal FOV at 16:9
     const TOTAL_RUN_TARGETS = 30;
 
     const SPEED_POINTS_MAX = 2.000;
     const SPEED_MIN_MS = 250;
-    const ACCURACY_POINTS_SCALE = 30.0;
 
     const MODES = {
       easy: { name: 'Easy', multiplier: 1.0, lifetimeMs: 2500 },
@@ -1304,7 +1514,7 @@
       hard: { name: 'Hard', multiplier: 3.0, lifetimeMs: 900 }
     };
 
-    // --- WEAPONS (NO AMMO, NO RELOAD) ---
+    // --- WEAPONS ---
     const WEAPONS = {
       vandal: {
         id: 'vandal',
@@ -1347,15 +1557,239 @@
       }
     };
 
+    // --- WEB AUDIO SYNTHESIZER ENGINE ---
+    const AudioEngine = {
+      ctx: null,
+      masterGain: null,
+      noiseBuffer: null,
+
+      init() {
+        if (!this.ctx) {
+          const AC = window.AudioContext || window.webkitAudioContext;
+          if (AC) {
+            this.ctx = new AC();
+            this.masterGain = this.ctx.createGain();
+            this.masterGain.connect(this.ctx.destination);
+            this.updateVolume();
+            this.createNoiseBuffer();
+          }
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      },
+
+      updateVolume() {
+        if (!this.masterGain || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        const vol = state.soundEnabled ? state.soundVolume : 0.0;
+        this.masterGain.gain.cancelScheduledValues(now);
+        this.masterGain.gain.setValueAtTime(vol, now);
+      },
+
+      createNoiseBuffer() {
+        if (!this.ctx) return;
+        const bufferSize = this.ctx.sampleRate * 0.1; // 100ms noise
+        this.noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = this.noiseBuffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = Math.random() * 2 - 1;
+        }
+      },
+
+      playGunshot(type) {
+        if (!this.ctx || !state.soundEnabled) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        if (type === 'sheriff') {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(280, now);
+          osc.frequency.exponentialRampToValueAtTime(32, now + 0.18);
+          gain.gain.setValueAtTime(0.7, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
+        } else if (type === 'guardian') {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(360, now);
+          osc.frequency.exponentialRampToValueAtTime(45, now + 0.14);
+          gain.gain.setValueAtTime(0.55, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.14);
+        } else {
+          // Vandal
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(320, now);
+          osc.frequency.exponentialRampToValueAtTime(40, now + 0.12);
+          gain.gain.setValueAtTime(0.5, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+        }
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.18);
+      },
+
+      // Hit body: short click
+      playHitBody() {
+        if (!this.ctx || !state.soundEnabled) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(650, now);
+        osc.frequency.exponentialRampToValueAtTime(140, now + 0.04);
+        gain.gain.setValueAtTime(0.65, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.05);
+      },
+
+      // Hit head: higher, brighter chime
+      playHitHead() {
+        if (!this.ctx || !state.soundEnabled) return;
+        const now = this.ctx.currentTime;
+        [1320, 1980].forEach(freq => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now);
+          osc.frequency.exponentialRampToValueAtTime(freq * 1.15, now + 0.22);
+          gain.gain.setValueAtTime(0.45, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+          osc.connect(gain);
+          gain.connect(this.masterGain);
+          osc.start(now);
+          osc.stop(now + 0.26);
+        });
+      },
+
+      // Hit legs: soft low tick
+      playHitLegs() {
+        if (!this.ctx || !state.soundEnabled) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(180, now);
+        osc.frequency.exponentialRampToValueAtTime(60, now + 0.06);
+        gain.gain.setValueAtTime(0.45, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.065);
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.07);
+      },
+
+      // Miss: short dry tick
+      playMiss() {
+        if (!this.ctx || !state.soundEnabled) return;
+        const now = this.ctx.currentTime;
+        if (this.noiseBuffer) {
+          const src = this.ctx.createBufferSource();
+          src.buffer = this.noiseBuffer;
+          const filter = this.ctx.createBiquadFilter();
+          filter.type = 'bandpass';
+          filter.frequency.setValueAtTime(1200, now);
+          filter.Q.setValueAtTime(3.0, now);
+          const gain = this.ctx.createGain();
+          gain.gain.setValueAtTime(0.35, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
+          src.connect(filter);
+          filter.connect(gain);
+          gain.connect(this.masterGain);
+          src.start(now);
+          src.stop(now + 0.04);
+        } else {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(260, now);
+          gain.gain.setValueAtTime(0.25, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+          osc.connect(gain);
+          gain.connect(this.masterGain);
+          osc.start(now);
+          osc.stop(now + 0.035);
+        }
+      },
+
+      // Kill: rising two-tone chime
+      playKill() {
+        if (!this.ctx || !state.soundEnabled) return;
+        const now = this.ctx.currentTime;
+        const osc1 = this.ctx.createOscillator();
+        const gain1 = this.ctx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(660, now);
+        gain1.gain.setValueAtTime(0.4, now);
+        gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+        osc1.connect(gain1);
+        gain1.connect(this.masterGain);
+        osc1.start(now);
+        osc1.stop(now + 0.085);
+
+        const osc2 = this.ctx.createOscillator();
+        const gain2 = this.ctx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(1050, now + 0.08);
+        gain2.gain.setValueAtTime(0.45, now + 0.08);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+        osc2.connect(gain2);
+        gain2.connect(this.masterGain);
+        osc2.start(now + 0.08);
+        osc2.stop(now + 0.29);
+      },
+
+      // Enemy shot: low thump
+      playEnemyShot() {
+        if (!this.ctx || !state.soundEnabled) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(90, now);
+        osc.frequency.exponentialRampToValueAtTime(32, now + 0.18);
+        gain.gain.setValueAtTime(0.55, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.19);
+      },
+
+      // Damage taken: short descending tone
+      playDamageTaken() {
+        if (!this.ctx || !state.soundEnabled) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(340, now);
+        osc.frequency.exponentialRampToValueAtTime(110, now + 0.2);
+        gain.gain.setValueAtTime(0.45, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.21);
+      }
+    };
+
     // --- GAME STATE ---
     const state = {
       sens: 0.35,
       dpi: 800,
       mode: 'medium',
+      distance: 20, // 10, 20, 30, 40, 50m
       map: 'random',
       weapon: 'vandal',
       strafeEnabled: false,
       targetColor: '#ff5b2e',
+      soundEnabled: true,
+      soundVolume: 0.60,
 
       // Crosshair settings
       crosshair: {
@@ -1365,7 +1799,7 @@
         centerDot: { enabled: false, size: 2 },
         inner: { enabled: true, length: 6, thickness: 2, gap: 3 },
         outer: { enabled: false, length: 2, thickness: 2, gap: 10 },
-        shape: 'default'
+        shape: 'default' // 'default' or 'circle'
       },
 
       isRunning: false,
@@ -1395,16 +1829,32 @@
       totalSpeedPoints: 0,
       targetHistory: [],
 
+      // Flick & Error Analysis
+      flickCount: 0,
+      overflickCount: 0,
+      underflickCount: 0,
+      totalHorizError: 0,
+      totalVertError: 0,
+      shotCountForError: 0,
+
+      // Panic warning tracking
+      panicCount: 0,
+
       // Player coordinates
-      playerPos: new THREE.Vector3(0, 1.7, 8),
+      playerPos: new THREE.Vector3(0, 1.7, 14),
       cameraYaw: 0,
       cameraPitch: 0
     };
 
+    // Rolling mouse tracking (last 350ms)
+    const mouseMoveLog = [];
+    const recentShots = []; // Last 8 shots { time, hit }
+    let lastPanicBannerTime = -9999;
+
     // Live cm/360
-    function getCm360() {
-      if (state.dpi <= 0 || state.sens <= 0) return 0;
-      return (360.0 * 2.54) / (state.dpi * state.sens * VALORANT_YAW_FACTOR);
+    function getCm360(sens = state.sens, dpi = state.dpi) {
+      if (dpi <= 0 || sens <= 0) return 0;
+      return (360.0 * 2.54) / (dpi * sens * VALORANT_YAW_FACTOR);
     }
 
     function updateSensReadout() {
@@ -1438,9 +1888,17 @@
       saveSettings();
     }
 
+    function setDistance(d) {
+      state.distance = parseInt(d, 10);
+      document.querySelectorAll('[data-dist]').forEach(b => b.classList.toggle('active', parseInt(b.dataset.dist, 10) === state.distance));
+      loadActiveMap(state.map);
+      saveSettings();
+    }
+
     function setMap(m) {
       state.map = m;
       document.querySelectorAll('[data-map]').forEach(b => b.classList.toggle('active', b.dataset.map === m));
+      loadActiveMap(m);
       saveSettings();
     }
 
@@ -1454,127 +1912,112 @@
 
     function toggleStrafe(on) {
       state.strafeEnabled = !!on;
-      if (!state.strafeEnabled) {
-        state.playerPos.set(0, 1.7, 8);
-        camera.position.copy(state.playerPos);
+      saveSettings();
+    }
+
+    function toggleSound(on) {
+      state.soundEnabled = !!on;
+      AudioEngine.updateVolume();
+      saveSettings();
+    }
+
+    function onVolumeChange(val) {
+      state.soundVolume = parseFloat(val);
+      AudioEngine.updateVolume();
+      saveSettings();
+    }
+
+    function onTargetColorChange(hex) {
+      state.targetColor = hex;
+      const picker = document.getElementById('target-color-picker');
+      if (picker) picker.value = hex;
+      document.querySelectorAll('.target-color-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.color.toLowerCase() === hex.toLowerCase());
+      });
+      if (currentTarget && currentTarget.active) {
+        currentTarget.updateColor();
       }
       saveSettings();
     }
 
-    // --- MAP DEFINITIONS (TERRAIN, ELEVATION, OBSTACLES) ---
-    const MAP_SPECS = {
+    // --- 8 NAMED MAPS + RANDOM (MID-TONE PALETTES, HIGH CONTRAST) ---
+    const MAP_PALETTES = {
       tieryard: {
         name: 'Tier Yard',
-        palette: { floor: 0x0f151e, wall: 0x0b1017, obs: 0x162230, trim: 0x48bfe3, ramp: 0x192738 },
-        platforms: [
-          // Low Ledges (1.2m)
-          { x: -5.5, y: 1.2, z: -4, w: 7, h: 1.2, d: 5 },
-          { x: 5.5, y: 1.2, z: -4, w: 7, h: 1.2, d: 5 },
-          // High Ledge (2.4m)
-          { x: 0, y: 2.4, z: -8.5, w: 12, h: 2.4, d: 4.5 }
-        ],
-        ramps: [
-          { x: -1.5, z: -5, w: 2.2, length: 4.0, startY: 0, endY: 1.2, angle: 0 },
-          { x: 0, z: -7.5, w: 3.0, length: 3.5, startY: 1.2, endY: 2.4, angle: 0 }
-        ],
-        obstacles: [
-          { x: -3.5, yCenter: 0.55, z: 2, w: 1.6, h: 1.1, d: 1.2, name: 'Crate' },
-          { x: 4, yCenter: 0.55, z: 1.5, w: 1.8, h: 1.1, d: 1.2, name: 'Crate' },
-          { x: -5.5, yCenter: 1.75, z: -4, w: 1.4, h: 1.1, d: 1.4, name: 'Ledge Crate' }
-        ]
+        floor: 0x3d4957, wall: 0x2b3542, wallAccent: 0x1f2731,
+        obs: 0x48586c, obsTop: 0x5a6d85, trim: 0x56ccf2, ramp: 0x415062
       },
       ledgeworks: {
         name: 'Ledge Works',
-        palette: { floor: 0x18140e, wall: 0x120e0a, obs: 0x271e14, trim: 0xf59e0b, ramp: 0x2e2418 },
-        platforms: [
-          { x: -5.5, y: 1.2, z: -3.5, w: 7, h: 1.2, d: 5 },
-          { x: 5.5, y: 2.4, z: -8, w: 8, h: 2.4, d: 5 },
-          { x: -5.5, y: 2.4, z: -8.5, w: 7, h: 2.4, d: 4.5 }
-        ],
-        ramps: [
-          { x: -2, z: -3.5, w: 2.2, length: 4.0, startY: 0, endY: 1.2, angle: 0 },
-          { x: 1.5, z: -6.5, w: 2.2, length: 4.0, startY: 1.2, endY: 2.4, angle: 0 }
-        ],
-        obstacles: [
-          { x: -3.5, yCenter: 0.55, z: 1.5, w: 1.6, h: 1.1, d: 1.2, name: 'Crate' },
-          { x: 3.5, yCenter: 0.55, z: 2.5, w: 1.8, h: 1.1, d: 1.2, name: 'Crate' },
-          { x: 4.5, yCenter: 1.2, z: -3, w: 1.2, h: 2.4, d: 1.2, name: 'Pillar' }
-        ]
+        floor: 0x4a4339, wall: 0x38322a, wallAccent: 0x2b261f,
+        obs: 0x5c5346, obsTop: 0x6e6354, trim: 0xf59e0b, ramp: 0x524a3e
       },
       glasshall: {
         name: 'Glass Hall',
-        palette: { floor: 0x0c1414, wall: 0x080e0e, obs: 0x142424, trim: 0x2dd4bf, ramp: 0x182a2a },
-        platforms: [
-          { x: 0, y: 1.2, z: -3.5, w: 9, h: 1.2, d: 5 },
-          { x: -6.5, y: 2.4, z: -8.5, w: 7, h: 2.4, d: 4.5 },
-          { x: 6.5, y: 2.4, z: -8.5, w: 7, h: 2.4, d: 4.5 }
-        ],
-        ramps: [
-          { x: 0, z: -6.5, w: 2.5, length: 4.0, startY: 1.2, endY: 2.4, angle: 0 }
-        ],
-        obstacles: [
-          { x: -4.5, yCenter: 2.0, z: -2, w: 1.0, h: 4.0, d: 1.0, name: 'Tall Pillar' },
-          { x: 4.5, yCenter: 2.0, z: -2, w: 1.0, h: 4.0, d: 1.0, name: 'Tall Pillar' },
-          { x: -2.5, yCenter: 0.55, z: 2, w: 1.8, h: 1.1, d: 1.0, name: 'Crate' },
-          { x: 2.5, yCenter: 0.55, z: 2, w: 1.8, h: 1.1, d: 1.0, name: 'Crate' }
-        ]
+        floor: 0x354b4b, wall: 0x273939, wallAccent: 0x1d2c2c,
+        obs: 0x435f5f, obsTop: 0x537575, trim: 0x2dd4bf, ramp: 0x3c5555
       },
       cratecourt: {
         name: 'Crate Court',
-        palette: { floor: 0x141210, wall: 0x0f0e0c, obs: 0x211e1a, trim: 0xd6d3d1, ramp: 0x282420 },
-        platforms: [
-          { x: -5.5, y: 1.2, z: -4, w: 7, h: 1.2, d: 5 },
-          { x: 5.5, y: 1.2, z: -4, w: 7, h: 1.2, d: 5 },
-          { x: 0, y: 2.4, z: -8.5, w: 10, h: 2.4, d: 5 }
-        ],
-        ramps: [
-          { x: 0, z: -4.5, w: 2.5, length: 4.0, startY: 0, endY: 1.2, angle: 0 },
-          { x: -2.5, z: -7.0, w: 2.2, length: 3.5, startY: 1.2, endY: 2.4, angle: 0 }
-        ],
-        obstacles: [
-          { x: -4.5, yCenter: 0.55, z: 1, w: 2.0, h: 1.1, d: 1.4, name: 'Crate Cluster' },
-          { x: 4.5, yCenter: 0.55, z: 1, w: 2.0, h: 1.1, d: 1.4, name: 'Crate Cluster' },
-          { x: 0, yCenter: 0.55, z: 3, w: 2.2, h: 1.1, d: 1.0, name: 'Low Cover' }
-        ]
+        floor: 0x47423e, wall: 0x36322e, wallAccent: 0x292623,
+        obs: 0x59534e, obsTop: 0x6b645e, trim: 0xe2e8f0, ramp: 0x4f4944
+      },
+      pillarrange: {
+        name: 'Pillar Range',
+        floor: 0x433e4f, wall: 0x322e3d, wallAccent: 0x26232e,
+        obs: 0x544e63, obsTop: 0x665f78, trim: 0xa78bfa, ramp: 0x4b4558
+      },
+      stephaven: {
+        name: 'Step Haven',
+        floor: 0x524639, wall: 0x3f352a, wallAccent: 0x30281f,
+        obs: 0x665747, obsTop: 0x7a6955, trim: 0xfbbf24, ramp: 0x5c4e3f
+      },
+      ironbastion: {
+        name: 'Iron Bastion',
+        floor: 0x3e4247, wall: 0x2e3236, wallAccent: 0x222529,
+        obs: 0x4e545a, obsTop: 0x60676e, trim: 0xf43f5e, ramp: 0x464b50
+      },
+      cobaltloft: {
+        name: 'Cobalt Loft',
+        floor: 0x324054, wall: 0x242e3d, wallAccent: 0x1b232e,
+        obs: 0x41536d, obsTop: 0x52698a, trim: 0x38bdf8, ramp: 0x3a4a62
       }
     };
 
-        // Shared Builder that creates map geometry from spec
     let mapGroup = null;
     let spawnZones = [];
     let mapSolidBoxes = [];
-    let rimLight = null;
+    let currentRoomSize = 34;
 
-    // Contrast Verification between map palette and target color
-    function checkPaletteContrast(spec, targetHex = '#ff5b2e') {
+    function checkPaletteContrast(palette, targetHex = '#ff5b2e') {
       const tCol = new THREE.Color(targetHex);
       ['floor', 'wall', 'obs'].forEach(k => {
-        if (spec.palette && spec.palette[k] !== undefined) {
-          const pCol = new THREE.Color(spec.palette[k]);
+        if (palette && palette[k] !== undefined) {
+          const pCol = new THREE.Color(palette[k]);
           const dist = Math.hypot(tCol.r - pCol.r, tCol.g - pCol.g, tCol.b - pCol.b);
           if (dist < 0.28) {
-            console.warn(`[Contrast Warning] Map "${spec.name}" ${k} color (#${pCol.getHexString()}) is too close to target color (${targetHex}). Distance: ${dist.toFixed(3)}`);
+            console.warn(`[Contrast Warning] Map ${palette.name} ${k} (#${pCol.getHexString()}) is too close to target color (${targetHex}). Dist: ${dist.toFixed(3)}`);
           }
         }
       });
     }
 
-    // Footprint check: 0.6m diameter circle (radius 0.3m) around target center
+    // Footprint collision check: 0.6m diameter circle (radius 0.3m)
     function isTargetFootprintValid(cx, cy, cz) {
-      const r = 0.30; // 0.6 m diameter circle footprint
+      const r = 0.30;
+      const halfRoom = currentRoomSize / 2 - 1.2;
 
-      // 1. Enclosed room bounds check (24m x 24m room: interior is [-11.7, 11.7])
-      if (cx - r < -11.7 || cx + r > 11.7 || cz - r < -11.7 || cz + r > 11.7) {
+      // Closed room boundaries
+      if (cx - r < -halfRoom || cx + r > halfRoom || cz - r < -halfRoom || cz + r > halfRoom) {
         return false;
       }
 
-      // 2. Elevation & surface support: if cy > 0.05, feet must be supported on top of a ledge or ramp top
+      // Height surface support check
       if (cy > 0.05) {
         let supported = false;
         for (let i = 0; i < mapSolidBoxes.length; i++) {
           const b = mapSolidBoxes[i];
-          if (b.isLedge && Math.abs(b.topY - cy) < 0.08) {
-            // Target footprint circle must be completely supported on the ledge top
+          if (b.isLedge && Math.abs(b.topY - cy) < 0.1) {
             if (cx - r >= b.minX && cx + r <= b.maxX && cz - r >= b.minZ && cz + r <= b.maxZ) {
               supported = true;
               break;
@@ -1584,25 +2027,23 @@
         if (!supported) return false;
       }
 
-      // 3. Collision against all solid boxes (obstacles, crates, pillars, ramps, ledges)
+      // Collision against all solid boxes
       const targetBottom = cy;
       const targetTop = cy + 1.82;
 
       for (let i = 0; i < mapSolidBoxes.length; i++) {
         const b = mapSolidBoxes[i];
-        // If standing on top of this ledge, the target is above it, not inside it
         if (b.isLedge && targetBottom >= b.maxY - 0.05) {
           continue;
         }
 
-        // Vertical overlap check
         if (targetBottom + 0.05 < b.maxY && targetTop > b.minY) {
           const closestX = Math.max(b.minX, Math.min(cx, b.maxX));
           const closestZ = Math.max(b.minZ, Math.min(cz, b.maxZ));
           const dx = cx - closestX;
           const dz = cz - closestZ;
           if (dx * dx + dz * dz < r * r) {
-            return false; // Footprint overlaps solid volume
+            return false;
           }
         }
       }
@@ -1614,7 +2055,68 @@
       mapSolidBoxes.push({ minX, maxX, minY, maxY, minZ, maxZ, isLedge, topY });
     }
 
-    function buildMapFromSpec(spec) {
+    // Helper: Solid Box Platform with contrasting vertical face and 2px top Edge line
+    function createSolidPlatform(w, h, d, x, y, z, p, isLedge = true) {
+      const group = new THREE.Group();
+
+      const sideMat = new THREE.MeshStandardMaterial({ color: p.obs, roughness: 0.8, metalness: 0 });
+      const topMat = new THREE.MeshStandardMaterial({ color: p.obsTop, roughness: 0.75, metalness: 0 });
+
+      // Body box
+      const bodyGeo = new THREE.BoxGeometry(w, h, d);
+      const bodyMesh = new THREE.Mesh(bodyGeo, sideMat);
+      bodyMesh.position.set(0, h / 2, 0);
+      bodyMesh.castShadow = true;
+      bodyMesh.receiveShadow = true;
+      bodyMesh.userData = { isObstacle: true, name: isLedge ? 'Ledge' : 'Crate' };
+      group.add(bodyMesh);
+
+      // Top contrasting plane
+      const topGeo = new THREE.PlaneGeometry(w, d);
+      const topMesh = new THREE.Mesh(topGeo, topMat);
+      topMesh.rotation.x = -Math.PI / 2;
+      topMesh.position.set(0, h + 0.002, 0);
+      topMesh.receiveShadow = true;
+      group.add(topMesh);
+
+      // Sharp edge lines on platform top (EdgesGeometry 2px)
+      const edgeGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(w, 0.02, d));
+      const edgeMat = new THREE.LineBasicMaterial({ color: p.trim, linewidth: 2 });
+      const edgeLines = new THREE.LineSegments(edgeGeo, edgeMat);
+      edgeLines.position.set(0, h + 0.01, 0);
+      group.add(edgeLines);
+
+      group.position.set(x, y, z);
+      mapGroup.add(group);
+      environmentColliders.push(bodyMesh);
+
+      addSolidBox(x - w / 2, x + w / 2, y, y + h, z - d / 2, z + d / 2, isLedge, y + h);
+      return group;
+    }
+
+    // Helper: Solid Ramp
+    function createSolidRamp(w, length, startY, endY, x, z, p) {
+      const dy = endY - startY;
+      const slopeLen = Math.hypot(length, dy);
+      const pitchAngle = Math.atan2(dy, length);
+
+      const rampMat = new THREE.MeshStandardMaterial({ color: p.ramp, roughness: 0.8, metalness: 0 });
+      const rampGeo = new THREE.BoxGeometry(w, 0.25, slopeLen);
+      const rampMesh = new THREE.Mesh(rampGeo, rampMat);
+      const midY = (startY + endY) / 2;
+      rampMesh.position.set(x, midY, z);
+      rampMesh.rotation.x = -pitchAngle;
+      rampMesh.castShadow = true;
+      rampMesh.receiveShadow = true;
+      rampMesh.userData = { isObstacle: true, name: 'Ramp' };
+      mapGroup.add(rampMesh);
+      environmentColliders.push(rampMesh);
+
+      addSolidBox(x - w / 2, x + w / 2, Math.min(startY, endY), Math.max(startY, endY) + 0.25, z - length / 2, z + length / 2, true, endY);
+    }
+
+    // Dynamic Closed Room Builder scaling with Distance
+    function buildMap(mapId) {
       if (mapGroup) {
         scene.remove(mapGroup);
         environmentColliders.length = 0;
@@ -1623,13 +2125,32 @@
       }
 
       mapGroup = new THREE.Group();
-      const p = spec.palette;
 
-      checkPaletteContrast(spec, state.targetColor);
+      // Determine palette
+      let chosenKey = mapId;
+      if (chosenKey === 'random') {
+        const keys = Object.keys(MAP_PALETTES);
+        chosenKey = keys[Math.floor(Math.random() * keys.length)];
+      }
+      const p = MAP_PALETTES[chosenKey] || MAP_PALETTES.tieryard;
+      checkPaletteContrast(p, state.targetColor);
 
-      // 1. CLOSED ROOM FLOOR (24 m x 24 m)
-      const floorGeo = new THREE.PlaneGeometry(24, 24);
-      const floorMat = new THREE.MeshStandardMaterial({ color: p.floor, roughness: 0.85, metalness: 0.15 });
+      // Arena Closed Room Dimensions: distance * 1.4 + 6m
+      const dist = state.distance;
+      currentRoomSize = dist * 1.4 + 6.0;
+      const wallHeight = (dist >= 40) ? 8.0 : 6.0;
+      const halfSize = currentRoomSize / 2;
+
+      // Position Player: back wall minus 3m
+      state.playerPos.set(0, 1.7, halfSize - 3.0);
+      if (camera) camera.position.copy(state.playerPos);
+
+      // Target engagement center Z
+      const zc = state.playerPos.z - dist * 0.8;
+
+      // 1. FLOOR (24m up to 76m depending on distance)
+      const floorGeo = new THREE.PlaneGeometry(currentRoomSize, currentRoomSize);
+      const floorMat = new THREE.MeshStandardMaterial({ color: p.floor, roughness: 0.8, metalness: 0 });
       const floor = new THREE.Mesh(floorGeo, floorMat);
       floor.rotation.x = -Math.PI / 2;
       floor.receiveShadow = true;
@@ -1637,169 +2158,421 @@
       mapGroup.add(floor);
       environmentColliders.push(floor);
 
-      // Floor Grid (Ends precisely at the 24m walls)
-      const grid = new THREE.GridHelper(24, 24, p.trim, 0x1f1d19);
+      // Grid helper ending precisely at walls
+      const grid = new THREE.GridHelper(currentRoomSize, Math.round(currentRoomSize), p.trim, p.wallAccent);
       grid.position.y = 0.005;
       mapGroup.add(grid);
 
-      // 2. CLOSED ROOM CEILING (24 m x 24 m at y = 6m)
-      const ceilingGeo = new THREE.PlaneGeometry(24, 24);
-      const ceilingMat = new THREE.MeshStandardMaterial({ color: p.wall, roughness: 0.95 });
-      const ceiling = new THREE.Mesh(ceilingGeo, ceilingMat);
-      ceiling.position.set(0, 6, 0);
-      ceiling.rotation.x = Math.PI / 2; // Facing down into the arena
+      // 2. CEILING
+      const ceilGeo = new THREE.PlaneGeometry(currentRoomSize, currentRoomSize);
+      const ceilMat = new THREE.MeshStandardMaterial({ color: p.wall, roughness: 0.9, metalness: 0 });
+      const ceiling = new THREE.Mesh(ceilGeo, ceilMat);
+      ceiling.position.set(0, wallHeight, 0);
+      ceiling.rotation.x = Math.PI / 2;
       ceiling.userData = { isObstacle: true, name: 'Ceiling' };
       mapGroup.add(ceiling);
       environmentColliders.push(ceiling);
 
-      // 3. CLOSED ROOM 4 BOUNDARY WALLS (6m high, solid colliders)
-      const wallMat = new THREE.MeshStandardMaterial({ color: p.wall, roughness: 0.9 });
-      function createRoomWall(x, z, w, d, name) {
-        const wall = new THREE.Mesh(new THREE.BoxGeometry(w, 6, d), wallMat);
-        wall.position.set(x, 3, z);
+      // 3. 4 BOUNDARY WALLS (Solid & shot-blocking)
+      const wallMat = new THREE.MeshStandardMaterial({ color: p.wall, roughness: 0.85, metalness: 0 });
+      function addWall(x, z, w, d, name) {
+        const wall = new THREE.Mesh(new THREE.BoxGeometry(w, wallHeight, d), wallMat);
+        wall.position.set(x, wallHeight / 2, z);
         wall.receiveShadow = true;
         wall.userData = { isObstacle: true, name: name };
         mapGroup.add(wall);
         environmentColliders.push(wall);
       }
 
-      // North, South, West, East walls enclosing 24m x 24m
-      createRoomWall(0, -12, 24, 0.5, 'North Wall');
-      createRoomWall(0, 12, 24, 0.5, 'South Wall');
-      createRoomWall(-12, 0, 0.5, 24, 'West Wall');
-      createRoomWall(12, 0, 0.5, 24, 'East Wall');
+      addWall(0, -halfSize, currentRoomSize, 0.6, 'North Wall');
+      addWall(0, halfSize, currentRoomSize, 0.6, 'South Wall');
+      addWall(-halfSize, 0, 0.6, currentRoomSize, 'West Wall');
+      addWall(halfSize, 0, 0.6, currentRoomSize, 'East Wall');
 
-      // Register boundary walls into mapSolidBoxes
-      addSolidBox(-12.5, 12.5, 0, 6, -12.5, -11.75); // North
-      addSolidBox(-12.5, 12.5, 0, 6, 11.75, 12.5);   // South
-      addSolidBox(-12.5, -11.75, 0, 6, -12.5, 12.5); // West
-      addSolidBox(11.75, 12.5, 0, 6, -12.5, 12.5);   // East
+      addSolidBox(-halfSize - 1, halfSize + 1, 0, wallHeight, -halfSize - 1, -halfSize + 0.3);
+      addSolidBox(-halfSize - 1, halfSize + 1, 0, wallHeight, halfSize - 0.3, halfSize + 1);
+      addSolidBox(-halfSize - 1, -halfSize + 0.3, 0, wallHeight, -halfSize - 1, halfSize + 1);
+      addSolidBox(halfSize - 0.3, halfSize + 1, 0, wallHeight, -halfSize - 1, halfSize + 1);
 
-      const obsMat = new THREE.MeshStandardMaterial({ color: p.obs, roughness: 0.7, metalness: 0.3 });
-      const rampMat = new THREE.MeshStandardMaterial({ color: p.ramp, roughness: 0.75 });
-      const trimMat = new THREE.MeshBasicMaterial({ color: p.trim });
-
-      // Platforms (Ledges at heights 1.2m and 2.4m)
-      spec.platforms.forEach(pl => {
-        const box = new THREE.Mesh(new THREE.BoxGeometry(pl.w, pl.h, pl.d), obsMat);
-        box.position.set(pl.x, pl.h / 2, pl.z);
-        box.castShadow = true;
-        box.receiveShadow = true;
-        box.userData = { isObstacle: true, name: 'Ledge' };
-        mapGroup.add(box);
-        environmentColliders.push(box);
-
-        // Accent top border
-        const tr = new THREE.Mesh(new THREE.BoxGeometry(pl.w + 0.04, 0.04, pl.d + 0.04), trimMat);
-        tr.position.set(pl.x, pl.h, pl.z);
-        mapGroup.add(tr);
-
-        // Solid collider
-        addSolidBox(pl.x - pl.w / 2, pl.x + pl.w / 2, 0, pl.h, pl.z - pl.d / 2, pl.z + pl.d / 2, true, pl.h);
-
-        // Spawn surface zone on ledge top
-        spawnZones.push({ x: pl.x, y: pl.y, z: pl.z, rx: (pl.w * 0.35), rz: (pl.d * 0.35), heightTier: pl.y });
-      });
-
-      // Ramps connecting heights
-      spec.ramps.forEach(rm => {
-        const dy = rm.endY - rm.startY;
-        const slopeLen = Math.hypot(rm.length, dy);
-        const pitchAngle = Math.atan2(dy, rm.length);
-
-        const rampMesh = new THREE.Mesh(new THREE.BoxGeometry(rm.w, 0.25, slopeLen), rampMat);
-        const midY = (rm.startY + rm.endY) / 2;
-        rampMesh.position.set(rm.x, midY, rm.z);
-        rampMesh.rotation.x = -pitchAngle;
-        rampMesh.castShadow = true;
-        rampMesh.receiveShadow = true;
-        rampMesh.userData = { isObstacle: true, name: 'Ramp' };
-        mapGroup.add(rampMesh);
-        environmentColliders.push(rampMesh);
-
-        // Solid box bounding the ramp
-        addSolidBox(
-          rm.x - rm.w / 2, rm.x + rm.w / 2,
-          Math.min(rm.startY, rm.endY), Math.max(rm.startY, rm.endY) + 0.25,
-          rm.z - rm.length / 2, rm.z + rm.length / 2,
-          true, rm.endY
-        );
-
-        // Spawn zone at top of ramp
-        spawnZones.push({ x: rm.x, y: rm.endY, z: rm.z - (rm.length * 0.4), rx: (rm.w * 0.25), rz: 0.4, heightTier: rm.endY });
-      });
-
-      // Obstacles / Crates / Pillars
-      spec.obstacles.forEach(ob => {
-        const box = new THREE.Mesh(new THREE.BoxGeometry(ob.w, ob.h, ob.d), obsMat);
-        box.position.set(ob.x, ob.yCenter, ob.z);
-        box.castShadow = true;
-        box.receiveShadow = true;
-        box.userData = { isObstacle: true, name: ob.name };
-        mapGroup.add(box);
-        environmentColliders.push(box);
-
-        const tr = new THREE.Mesh(new THREE.BoxGeometry(ob.w + 0.03, 0.03, ob.d + 0.03), trimMat);
-        tr.position.set(ob.x, ob.yCenter + ob.h / 2, ob.z);
-        mapGroup.add(tr);
-
-        // Solid obstacle box
-        addSolidBox(
-          ob.x - ob.w / 2, ob.x + ob.w / 2,
-          ob.yCenter - ob.h / 2, ob.yCenter + ob.h / 2,
-          ob.z - ob.d / 2, ob.z + ob.d / 2,
-          false, 0
-        );
-      });
+      // 4. MAP TERRAIN LAYOUTS (8 distinct designs + procedural)
+      if (chosenKey === 'tieryard') {
+        // Stepped ledges
+        createSolidPlatform(8, 1.2, 5, -6, 0, zc, p);
+        createSolidPlatform(8, 1.2, 5, 6, 0, zc, p);
+        createSolidPlatform(12, 2.4, 4.5, 0, 0, zc - 4, p);
+        createSolidRamp(2.5, 4.0, 0, 1.2, -1.5, zc - 1, p);
+        createSolidRamp(3.0, 3.5, 1.2, 2.4, 0, zc - 3, p);
+        createSolidPlatform(1.6, 1.1, 1.2, -3.5, 0, zc + 4, p, false);
+        createSolidPlatform(1.8, 1.1, 1.2, 4, 0, zc + 3, p, false);
+        spawnZones.push({ x: -6, y: 1.2, z: zc, rx: 3, rz: 1.8 });
+        spawnZones.push({ x: 6, y: 1.2, z: zc, rx: 3, rz: 1.8 });
+        spawnZones.push({ x: 0, y: 2.4, z: zc - 4, rx: 4.5, rz: 1.5 });
+      } else if (chosenKey === 'ledgeworks') {
+        // Ledges & catwalks
+        createSolidPlatform(8, 1.2, 5, -6, 0, zc + 1, p);
+        createSolidPlatform(9, 2.4, 5, 5.5, 0, zc - 3.5, p);
+        createSolidPlatform(7, 2.4, 4.5, -6, 0, zc - 4, p);
+        createSolidRamp(2.4, 4.0, 0, 1.2, -2, zc + 1, p);
+        createSolidRamp(2.4, 4.0, 1.2, 2.4, 1.5, zc - 2, p);
+        createSolidPlatform(1.6, 1.1, 1.2, -3.5, 0, zc + 4.5, p, false);
+        createSolidPlatform(1.8, 1.1, 1.2, 3.5, 0, zc + 4.5, p, false);
+        createSolidPlatform(1.2, 2.4, 1.2, 5, 0, zc + 1.5, p, false);
+        spawnZones.push({ x: -6, y: 1.2, z: zc + 1, rx: 3, rz: 1.8 });
+        spawnZones.push({ x: 5.5, y: 2.4, z: zc - 3.5, rx: 3.5, rz: 1.8 });
+        spawnZones.push({ x: -6, y: 2.4, z: zc - 4, rx: 2.5, rz: 1.5 });
+      } else if (chosenKey === 'glasshall') {
+        // Center terrace and flanking towers
+        createSolidPlatform(10, 1.2, 5, 0, 0, zc + 1, p);
+        createSolidPlatform(7, 2.4, 4.5, -7, 0, zc - 4, p);
+        createSolidPlatform(7, 2.4, 4.5, 7, 0, zc - 4, p);
+        createSolidRamp(2.8, 4.0, 1.2, 2.4, 0, zc - 2, p);
+        createSolidPlatform(1.0, 4.0, 1.0, -4.5, 0, zc + 2.5, p, false);
+        createSolidPlatform(1.0, 4.0, 1.0, 4.5, 0, zc + 2.5, p, false);
+        createSolidPlatform(1.8, 1.1, 1.0, -2.5, 0, zc + 5, p, false);
+        createSolidPlatform(1.8, 1.1, 1.0, 2.5, 0, zc + 5, p, false);
+        spawnZones.push({ x: 0, y: 1.2, z: zc + 1, rx: 4, rz: 1.8 });
+        spawnZones.push({ x: -7, y: 2.4, z: zc - 4, rx: 2.5, rz: 1.5 });
+        spawnZones.push({ x: 7, y: 2.4, z: zc - 4, rx: 2.5, rz: 1.5 });
+      } else if (chosenKey === 'cratecourt') {
+        // Crate clusters & low cover
+        createSolidPlatform(7, 1.2, 5, -6, 0, zc, p);
+        createSolidPlatform(7, 1.2, 5, 6, 0, zc, p);
+        createSolidPlatform(10, 2.4, 5, 0, 0, zc - 4, p);
+        createSolidRamp(2.6, 4.0, 0, 1.2, 0, zc - 0.5, p);
+        createSolidPlatform(2.2, 1.1, 1.4, -4.5, 0, zc + 4, p, false);
+        createSolidPlatform(2.2, 1.1, 1.4, 4.5, 0, zc + 4, p, false);
+        createSolidPlatform(2.4, 1.1, 1.0, 0, 0, zc + 5, p, false);
+        spawnZones.push({ x: -6, y: 1.2, z: zc, rx: 2.5, rz: 1.8 });
+        spawnZones.push({ x: 6, y: 1.2, z: zc, rx: 2.5, rz: 1.8 });
+        spawnZones.push({ x: 0, y: 2.4, z: zc - 4, rx: 4, rz: 1.8 });
+      } else if (chosenKey === 'pillarrange') {
+        // Vertical pillars and tiered dais
+        createSolidPlatform(8, 1.2, 4.5, 0, 0, zc + 1, p);
+        createSolidPlatform(8, 2.4, 4.5, 0, 0, zc - 4, p);
+        createSolidRamp(2.5, 3.8, 1.2, 2.4, 0, zc - 2, p);
+        createSolidPlatform(1.2, 3.5, 1.2, -6, 0, zc, p, false);
+        createSolidPlatform(1.2, 3.5, 1.2, 6, 0, zc, p, false);
+        createSolidPlatform(1.2, 4.5, 1.2, -6, 0, zc - 4, p, false);
+        createSolidPlatform(1.2, 4.5, 1.2, 6, 0, zc - 4, p, false);
+        createSolidPlatform(1.6, 1.1, 1.2, -3.5, 0, zc + 4, p, false);
+        createSolidPlatform(1.6, 1.1, 1.2, 3.5, 0, zc + 4, p, false);
+        spawnZones.push({ x: 0, y: 1.2, z: zc + 1, rx: 3, rz: 1.6 });
+        spawnZones.push({ x: 0, y: 2.4, z: zc - 4, rx: 3, rz: 1.6 });
+      } else if (chosenKey === 'stephaven') {
+        // Stadium stepped terraces
+        createSolidPlatform(14, 0.8, 3.5, 0, 0, zc + 3, p);
+        createSolidPlatform(12, 1.6, 3.5, 0, 0, zc - 0.5, p);
+        createSolidPlatform(10, 2.4, 3.5, 0, 0, zc - 4, p);
+        createSolidRamp(2.2, 3.5, 0, 0.8, -5.5, zc + 4, p);
+        createSolidRamp(2.2, 3.5, 0.8, 1.6, 5.5, zc + 0.5, p);
+        createSolidPlatform(1.4, 1.1, 1.2, -3, 0, zc + 6, p, false);
+        createSolidPlatform(1.4, 1.1, 1.2, 3, 0, zc + 6, p, false);
+        spawnZones.push({ x: 0, y: 0.8, z: zc + 3, rx: 5.5, rz: 1.2 });
+        spawnZones.push({ x: 0, y: 1.6, z: zc - 0.5, rx: 4.5, rz: 1.2 });
+        spawnZones.push({ x: 0, y: 2.4, z: zc - 4, rx: 4, rz: 1.2 });
+      } else if (chosenKey === 'ironbastion') {
+        // Fortress ramparts & battlements
+        createSolidPlatform(14, 1.2, 4.0, 0, 0, zc, p);
+        createSolidPlatform(6, 2.4, 4.5, -6, 0, zc - 4, p);
+        createSolidPlatform(6, 2.4, 4.5, 6, 0, zc - 4, p);
+        createSolidRamp(2.6, 4.0, 0, 1.2, 0, zc + 1.5, p);
+        createSolidPlatform(2.0, 1.2, 1.0, -3.5, 1.2, zc - 1, p, false);
+        createSolidPlatform(2.0, 1.2, 1.0, 3.5, 1.2, zc - 1, p, false);
+        createSolidPlatform(1.8, 1.1, 1.2, -4, 0, zc + 4.5, p, false);
+        createSolidPlatform(1.8, 1.1, 1.2, 4, 0, zc + 4.5, p, false);
+        spawnZones.push({ x: 0, y: 1.2, z: zc, rx: 5.5, rz: 1.4 });
+        spawnZones.push({ x: -6, y: 2.4, z: zc - 4, rx: 2.2, rz: 1.6 });
+        spawnZones.push({ x: 6, y: 2.4, z: zc - 4, rx: 2.2, rz: 1.6 });
+      } else if (chosenKey === 'cobaltloft') {
+        // Sky-bridge and elevated catwalks
+        createSolidPlatform(7, 1.2, 4.5, -6, 0, zc + 1, p);
+        createSolidPlatform(7, 1.2, 4.5, 6, 0, zc + 1, p);
+        createSolidPlatform(14, 2.4, 3.5, 0, 0, zc - 4, p); // Bridge
+        createSolidRamp(2.4, 4.0, 1.2, 2.4, -4.5, zc - 2, p);
+        createSolidRamp(2.4, 4.0, 1.2, 2.4, 4.5, zc - 2, p);
+        createSolidPlatform(1.8, 1.1, 1.2, -2.5, 0, zc + 4.5, p, false);
+        createSolidPlatform(1.8, 1.1, 1.2, 2.5, 0, zc + 4.5, p, false);
+        spawnZones.push({ x: -6, y: 1.2, z: zc + 1, rx: 2.5, rz: 1.6 });
+        spawnZones.push({ x: 6, y: 1.2, z: zc + 1, rx: 2.5, rz: 1.6 });
+        spawnZones.push({ x: 0, y: 2.4, z: zc - 4, rx: 5.5, rz: 1.2 });
+      } else {
+        // Procedural
+        createSolidPlatform(8, 1.2, 5, -5.5, 0, zc + 1, p);
+        createSolidPlatform(8, 1.2, 5, 5.5, 0, zc + 1, p);
+        createSolidPlatform(11, 2.4, 4.5, 0, 0, zc - 4, p);
+        createSolidRamp(2.6, 4.0, 1.2, 2.4, 0, zc - 2, p);
+        createSolidPlatform(1.8, 1.1, 1.2, -3.5, 0, zc + 4, p, false);
+        createSolidPlatform(1.8, 1.1, 1.2, 3.5, 0, zc + 4, p, false);
+        spawnZones.push({ x: -5.5, y: 1.2, z: zc + 1, rx: 3, rz: 1.8 });
+        spawnZones.push({ x: 5.5, y: 1.2, z: zc + 1, rx: 3, rz: 1.8 });
+        spawnZones.push({ x: 0, y: 2.4, z: zc - 4, rx: 4.5, rz: 1.6 });
+      }
 
       // Ground Spawn Zones (y = 0)
-      for (let x = -7; x <= 7; x += 3.5) {
-        for (let z = 0; z >= -9; z -= 3.5) {
-          spawnZones.push({ x: x, y: 0, z: z, rx: 1.2, rz: 1.2, heightTier: 0 });
+      for (let x = -8; x <= 8; x += 3.5) {
+        for (let zOffset = -2; zOffset <= 5; zOffset += 3) {
+          spawnZones.push({ x: x, y: 0, z: zc + zOffset, rx: 1.2, rz: 1.2 });
         }
       }
 
       scene.add(mapGroup);
     }
 
-    // Procedural Random Map Builder (fits strictly within 24m x 24m room)
-    function generateRandomMapSpec() {
-      const themes = ['tieryard', 'ledgeworks', 'glasshall', 'cratecourt'];
-      const pickTheme = themes[Math.floor(Math.random() * themes.length)];
-      const baseSpec = MAP_SPECS[pickTheme];
-
-      const platforms = [
-        { x: -5.5 + (Math.random() * 1.5 - 0.75), y: 1.2, z: -3.5 + (Math.random() * 1.5), w: 7, h: 1.2, d: 5 },
-        { x: 5.5 + (Math.random() * 1.5 - 0.75), y: 1.2, z: -3.5 + (Math.random() * 1.5), w: 7, h: 1.2, d: 5 },
-        { x: (Math.random() * 2 - 1), y: 2.4, z: -8.5 + (Math.random() * 1.0), w: 10, h: 2.4, d: 4.5 }
-      ];
-
-      const ramps = [
-        { x: 0, z: -5.5, w: 2.5, length: 3.5, startY: 1.2, endY: 2.4, angle: 0 }
-      ];
-
-      const obstacles = [
-        { x: -3.5, yCenter: 0.55, z: 2, w: 1.6, h: 1.1, d: 1.2, name: 'Crate' },
-        { x: 3.5, yCenter: 0.55, z: 2, w: 1.6, h: 1.1, d: 1.2, name: 'Crate' }
-      ];
-
-      return {
-        name: 'Random',
-        palette: baseSpec.palette,
-        platforms,
-        ramps,
-        obstacles
-      };
+    function loadActiveMap(mapId) {
+      buildMap(mapId);
     }
 
-    function loadActiveMap(mapId) {
-      if (mapId === 'random') {
-        const spec = generateRandomMapSpec();
-        buildMapFromSpec(spec);
-      } else {
-        const spec = MAP_SPECS[mapId] || MAP_SPECS.tieryard;
-        buildMapFromSpec(spec);
+    // --- REBUILT GUN MODELS (ACCURATE PROPORTIONS, VIEWMODEL ANCHORED) ---
+    let weaponGroup = null;
+    let muzzlePoint = null;
+
+    function setupWeaponViewModel() {
+      weaponGroup = new THREE.Group();
+      camera.add(weaponGroup);
+      scene.add(camera);
+      buildWeaponModel(state.weapon);
+    }
+
+    function buildWeaponModel(type) {
+      while (weaponGroup.children.length > 0) {
+        weaponGroup.remove(weaponGroup.children[0]);
       }
+
+      const gunMetalMat = new THREE.MeshStandardMaterial({ color: 0x181a1d, roughness: 0.35, metalness: 0.85 });
+      const gunBodyMat = new THREE.MeshStandardMaterial({ color: 0x282c34, roughness: 0.45, metalness: 0.6 });
+      const gunAccentMat = new THREE.MeshStandardMaterial({ color: 0x101114, roughness: 0.6, metalness: 0.2 });
+
+      muzzlePoint = new THREE.Object3D();
+
+      if (type === 'sheriff') {
+        // Heavy Pistol (~0.4m total length)
+        // Boxy Slide
+        const slide = new THREE.Mesh(new THREE.BoxGeometry(0.042, 0.055, 0.20), gunMetalMat);
+        slide.position.set(0, 0.04, -0.08);
+        weaponGroup.add(slide);
+
+        // Angled Grip
+        const grip = new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.12, 0.05), gunAccentMat);
+        grip.rotation.x = -0.26;
+        grip.position.set(0, -0.04, 0.01);
+        weaponGroup.add(grip);
+
+        // Cylinder Housing
+        const frame = new THREE.Mesh(new THREE.BoxGeometry(0.044, 0.045, 0.09), gunBodyMat);
+        frame.position.set(0, 0.02, -0.03);
+        weaponGroup.add(frame);
+
+        // Short Barrel
+        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.12, 8), gunMetalMat);
+        barrel.rotation.x = Math.PI / 2;
+        barrel.position.set(0, 0.045, -0.22);
+        weaponGroup.add(barrel);
+
+        muzzlePoint.position.set(0, 0.045, -0.29);
+      } else if (type === 'guardian') {
+        // Precision Rifle (~1.1m total length)
+        // Receiver
+        const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.042, 0.07, 0.32), gunBodyMat);
+        receiver.position.set(0, 0, -0.08);
+        weaponGroup.add(receiver);
+
+        // Narrow Stock
+        const stock = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.055, 0.28), gunAccentMat);
+        stock.position.set(0, -0.01, 0.20);
+        weaponGroup.add(stock);
+
+        // Grip
+        const grip = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.10, 0.045), gunAccentMat);
+        grip.rotation.x = -0.22;
+        grip.position.set(0, -0.07, 0.03);
+        weaponGroup.add(grip);
+
+        // Long Barrel
+        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.48, 8), gunMetalMat);
+        barrel.rotation.x = Math.PI / 2;
+        barrel.position.set(0, 0.018, -0.46);
+        weaponGroup.add(barrel);
+
+        // Muzzle brake
+        const brake = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.08, 8), gunMetalMat);
+        brake.rotation.x = Math.PI / 2;
+        brake.position.set(0, 0.018, -0.72);
+        weaponGroup.add(brake);
+
+        // Scope Tube on top
+        const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.22, 12), gunMetalMat);
+        scope.rotation.x = Math.PI / 2;
+        scope.position.set(0, 0.065, -0.06);
+        weaponGroup.add(scope);
+
+        muzzlePoint.position.set(0, 0.018, -0.77);
+      } else {
+        // Vandal Rifle (~0.9m total length)
+        // Receiver
+        const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.075, 0.34), gunBodyMat);
+        receiver.position.set(0, 0, -0.10);
+        weaponGroup.add(receiver);
+
+        // Straight Stock
+        const stock = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.07, 0.24), gunAccentMat);
+        stock.position.set(0, -0.005, 0.18);
+        weaponGroup.add(stock);
+
+        // Grip
+        const grip = new THREE.Mesh(new THREE.BoxGeometry(0.034, 0.11, 0.048), gunAccentMat);
+        grip.rotation.x = -0.22;
+        grip.position.set(0, -0.08, 0.02);
+        weaponGroup.add(grip);
+
+        // Handguard & Barrel
+        const handguard = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.048, 0.28), gunBodyMat);
+        handguard.position.set(0, 0.012, -0.38);
+        weaponGroup.add(handguard);
+
+        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.013, 0.16, 8), gunMetalMat);
+        barrel.rotation.x = Math.PI / 2;
+        barrel.position.set(0, 0.015, -0.54);
+        weaponGroup.add(barrel);
+
+        // Curved Magazine
+        const mag = new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.16, 0.075), gunAccentMat);
+        mag.rotation.x = 0.20;
+        mag.position.set(0, -0.10, -0.12);
+        weaponGroup.add(mag);
+
+        muzzlePoint.position.set(0, 0.015, -0.63);
+      }
+
+      weaponGroup.add(muzzlePoint);
+      weaponGroup.position.set(0.20, -0.17, -0.38);
+    }
+
+    // --- REUSABLE PRE-ALLOCATED POOLS (ZERO GC & NO FRAME SKIPS) ---
+    // 1. Tracer Pool
+    const TRACER_POOL_SIZE = 16;
+    const tracerPool = [];
+    let tracerGeo, tracerHitMat, tracerMissMat;
+
+    function initTracerPool() {
+      tracerGeo = new THREE.CylinderGeometry(0.012, 0.012, 1, 6);
+      tracerGeo.rotateX(Math.PI / 2);
+      tracerHitMat = new THREE.MeshBasicMaterial({ color: 0x5fd3b4, transparent: true, opacity: 0.95, depthWrite: false });
+      tracerMissMat = new THREE.MeshBasicMaterial({ color: 0xff5b2e, transparent: true, opacity: 0.95, depthWrite: false });
+
+      for (let i = 0; i < TRACER_POOL_SIZE; i++) {
+        const mesh = new THREE.Mesh(tracerGeo, tracerHitMat);
+        mesh.visible = false;
+        scene.add(mesh);
+        tracerPool.push({ mesh, active: false, birth: 0, durationMs: 120 });
+      }
+    }
+
+    function spawnBulletTracer(from, to, isHit) {
+      let tr = tracerPool.find(t => !t.active);
+      if (!tr) tr = tracerPool[0]; // Reuse oldest
+
+      const dist = from.distanceTo(to);
+      const midpoint = from.clone().add(to).multiplyScalar(0.5);
+
+      tr.mesh.position.copy(midpoint);
+      tr.mesh.lookAt(to);
+      tr.mesh.scale.set(1, 1, dist);
+      tr.mesh.material = isHit ? tracerHitMat : tracerMissMat;
+      tr.mesh.visible = true;
+      tr.active = true;
+      tr.birth = performance.now();
+    }
+
+    // 2. Kill Particles Pool
+    const PARTICLE_POOL_SIZE = 48;
+    const particlePool = [];
+    let particleHeadMat, particleBodyMat;
+
+    function initParticlePool() {
+      const pGeo = new THREE.BoxGeometry(0.12, 0.12, 0.12);
+      particleHeadMat = new THREE.MeshBasicMaterial({ color: 0xffd700, transparent: true, opacity: 1.0 });
+      particleBodyMat = new THREE.MeshBasicMaterial({ color: 0xff5b2e, transparent: true, opacity: 1.0 });
+
+      for (let i = 0; i < PARTICLE_POOL_SIZE; i++) {
+        const mesh = new THREE.Mesh(pGeo, particleBodyMat);
+        mesh.visible = false;
+        scene.add(mesh);
+        particlePool.push({
+          mesh,
+          active: false,
+          vel: new THREE.Vector3(),
+          birth: 0,
+          durationMs: 400
+        });
+      }
+    }
+
+    function spawnKillParticles(hitPos, zone) {
+      const isHead = (zone === 'head');
+      particleBodyMat.color.set(state.targetColor);
+
+      const count = 10;
+      let spawned = 0;
+      for (let i = 0; i < PARTICLE_POOL_SIZE && spawned < count; i++) {
+        const p = particlePool[i];
+        if (!p.active) {
+          p.active = true;
+          p.birth = performance.now();
+          p.mesh.position.copy(hitPos);
+          p.mesh.material = isHead ? particleHeadMat : particleBodyMat;
+          p.mesh.scale.set(1, 1, 1);
+          p.mesh.visible = true;
+
+          // Outward velocity burst
+          const theta = Math.random() * Math.PI * 2;
+          const speed = 2.0 + Math.random() * 3.5;
+          p.vel.set(
+            Math.cos(theta) * speed,
+            1.2 + Math.random() * 2.5,
+            Math.sin(theta) * speed
+          );
+          spawned++;
+        }
+      }
+    }
+
+    // 3. Pre-created Score Popups Pool (DOM)
+    const POPUP_POOL_SIZE = 8;
+    const popupPool = [];
+
+    function initPopupPool() {
+      const container = document.getElementById('popup-pool');
+      container.innerHTML = '';
+      for (let i = 0; i < POPUP_POOL_SIZE; i++) {
+        const el = document.createElement('div');
+        el.className = 'score-popup';
+        el.style.display = 'none';
+        container.appendChild(el);
+        popupPool.push({ el, active: false, startX: 0, startY: 0, startTime: 0, duration: 800 });
+      }
+    }
+
+    function showScorePopup(worldPos, text, color) {
+      if (!worldPos) return;
+      const p = worldPos.clone().project(camera);
+      if (p.z > 1.0) return;
+
+      const sx = (p.x * 0.5 + 0.5) * window.innerWidth;
+      const sy = (-(p.y * 0.5) + 0.5) * window.innerHeight;
+
+      let slot = popupPool.find(item => !item.active);
+      if (!slot) slot = popupPool[0];
+
+      slot.active = true;
+      slot.startTime = performance.now();
+      slot.startX = sx;
+      slot.startY = sy;
+      slot.el.textContent = text;
+      slot.el.style.color = color;
+      slot.el.style.left = `${Math.round(sx)}px`;
+      slot.el.style.top = `${Math.round(sy)}px`;
+      slot.el.style.opacity = '1';
+      slot.el.style.display = 'block';
     }
 
     // --- TARGET CLASS (GROUNDED, OUTLINED, DYNAMIC COLOR, PRE-CLIPPED STRAFE) ---
@@ -1832,7 +2605,7 @@
         const fwd = new THREE.Vector3(state.playerPos.x, this.origin.y, state.playerPos.z).sub(this.origin).normalize();
         this.lateralAxis.crossVectors(new THREE.Vector3(0, 1, 0), fwd).normalize();
 
-        // Compute allowed strafe range along lateralAxis pre-clipped at first obstacle
+        // Pre-clip strafe range against obstacles before moving
         this.maxOffsetPos = 0;
         this.maxOffsetNeg = 0;
 
@@ -1869,7 +2642,6 @@
       buildModel() {
         const group = new THREE.Group();
 
-        // Target materials with user-selected Target Color
         const baseColor = new THREE.Color(state.targetColor || '#ff5b2e');
         const headColor = baseColor.clone().multiplyScalar(0.7);
 
@@ -1877,7 +2649,6 @@
         this.limbMat = new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.4, metalness: 0.2 });
         this.headMat = new THREE.MeshStandardMaterial({ color: headColor, roughness: 0.45, metalness: 0.3 });
 
-        // Helper to add thin 1px dark EdgesGeometry outline around primitives
         function createOutlinedBox(w, h, d, mat) {
           const geo = new THREE.BoxGeometry(w, h, d);
           const mesh = new THREE.Mesh(geo, mat);
@@ -1936,7 +2707,7 @@
         shadow.position.set(0, 0.015, 0);
         group.add(shadow);
 
-        // Three Invisible Raycastable Hitboxes
+        // Raycastable Hitboxes
         const hbMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
 
         const headHb = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.32, 0.32), hbMat);
@@ -1996,7 +2767,7 @@
           return;
         }
 
-        // Enemy telegraph flash 400ms before expiration
+        // Telegraph flash 400ms before expiration
         if (this.lifetimeMs - elapsed <= 400 && !this.isTelegraphing) {
           this.flashTelegraph(400);
         }
@@ -2031,7 +2802,7 @@
           }
 
           this.mesh.position.copy(this.origin).addScaledVector(this.lateralAxis, this.currentOffset);
-          // Maintain top surface elevation - never sink feet below surface
+          // Never sink feet below surface
           this.mesh.position.y = this.origin.y;
         }
       }
@@ -2047,12 +2818,14 @@
       }
     }
 
-    // Spawn point finder with Footprint, Line-of-Sight & Elevation Verification
+    // Spawn point finder: Spawn Band [0.6 * distance, 1.0 * distance]
     function findValidSpawnPoint() {
       const eyePos = camera.position.clone();
       let bestPos = null;
+      const minDistance = state.distance * 0.6;
+      const maxDistance = state.distance * 1.0;
 
-      for (let attempt = 0; attempt < 40; attempt++) {
+      for (let attempt = 0; attempt < 50; attempt++) {
         const zone = spawnZones[Math.floor(Math.random() * spawnZones.length)];
         const rx = (Math.random() * 2 - 1) * zone.rx;
         const rz = (Math.random() * 2 - 1) * zone.rz;
@@ -2062,9 +2835,9 @@
         // Body footprint check: 0.6m circle must not overlap any solid obstacle or ledge wall
         if (!isTargetFootprintValid(candidate.x, candidate.y, candidate.z)) continue;
 
-        // Distance constraint: 8 to 18 m from player
+        // Distance constraint: 0.6x to 1.0x distance
         const dist = eyePos.distanceTo(candidate);
-        if (dist < 8.0 || dist > 18.0) continue;
+        if (dist < minDistance || dist > maxDistance) continue;
 
         // Elevation angle constraint: between -15 deg and +20 deg from eye
         const dy = (candidate.y + 1.2) - eyePos.y;
@@ -2084,9 +2857,10 @@
         }
       }
 
-      // Safe guaranteed fallback inside open room space
+      // Safe fallback inside valid distance band
       if (!bestPos) {
-        bestPos = new THREE.Vector3((Math.random() - 0.5) * 6, 0, -2);
+        const fallbackDist = (minDistance + maxDistance) * 0.5;
+        bestPos = new THREE.Vector3(0, 0, eyePos.z - fallbackDist);
       }
       return bestPos;
     }
@@ -2138,46 +2912,9 @@
       spawnNextTarget();
     }
 
-        // --- ACCURACY & SHOOTING ENGINE (NO AMMO, NO RELOAD) ---
+    // --- SHOOTING, FLICK & AIM ERROR TRACKING ---
     let isMouseDown = false;
     let autoFireTimer = 0;
-
-    // Floating Pop-up Score Animation (Projected from 3D Hit Point to Screen Space)
-    function showScorePopup(worldPos, text, color) {
-      if (!worldPos) return;
-      const p = worldPos.clone().project(camera);
-      if (p.z > 1.0) return; // Behind camera
-      const sx = (p.x * 0.5 + 0.5) * window.innerWidth;
-      const sy = (-(p.y * 0.5) + 0.5) * window.innerHeight;
-
-      const el = document.createElement('div');
-      el.className = 'score-popup';
-      el.textContent = text;
-      el.style.left = `${Math.round(sx)}px`;
-      el.style.top = `${Math.round(sy)}px`;
-      el.style.color = color;
-      document.body.appendChild(el);
-
-      const startY = sy;
-      const startTime = performance.now();
-      const duration = 800; // 0.8 s
-
-      function animPopup(now) {
-        const elapsed = now - startTime;
-        const progress = Math.min(1.0, elapsed / duration);
-        const currY = startY - progress * 40; // Rises ~40 px
-        const opacity = 1.0 - progress;
-        el.style.top = `${Math.round(currY)}px`;
-        el.style.opacity = `${opacity}`;
-
-        if (progress < 1.0) {
-          requestAnimationFrame(animPopup);
-        } else {
-          if (el.parentNode) el.parentNode.removeChild(el);
-        }
-      }
-      requestAnimationFrame(animPopup);
-    }
 
     function executeShot() {
       if (!state.isLocked || !state.isRunning) return;
@@ -2193,8 +2930,8 @@
 
       // Gun recoil viewmodel animation
       if (weaponGroup) {
-        weaponGroup.position.z = -0.45;
-        weaponGroup.rotation.x = 0.12;
+        weaponGroup.position.z = -0.33;
+        weaponGroup.rotation.x = 0.08;
       }
 
       // Movement Speed Spread Penalty
@@ -2206,7 +2943,7 @@
         moveErrorDeg = speedRatio * 5.4;
       }
 
-      // Continuous Firing Recoil Error Accumulation
+      // Consecutive firing recoil
       if (state.timeSinceLastShot < w.recoveryTimerSec) {
         state.consecutiveShots++;
       } else {
@@ -2223,7 +2960,6 @@
         sprayErrorDeg = Math.min(4.0, state.consecutiveShots * 0.85);
       }
 
-      // View Kick Up
       state.cameraRecoilPitch = Math.min(w.maxRecoilPitch, state.cameraRecoilPitch + w.recoilPitchPerShot);
       if (w.id === 'vandal' && state.consecutiveShots >= 6) {
         state.cameraRecoilYaw += (Math.random() - 0.5) * 0.022;
@@ -2233,7 +2969,6 @@
       const totalErrorDeg = baseErr + moveErrorDeg + sprayErrorDeg;
       const totalErrorRad = THREE.MathUtils.degToRad(totalErrorDeg);
 
-      // Offset Ray before intersection
       scene.updateMatrixWorld(true);
 
       const rayDir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
@@ -2251,7 +2986,12 @@
       const candidates = [...activeHitboxes, ...environmentColliders];
       const hits = raycaster.intersectObjects(candidates, true);
 
-      const muzzlePos = new THREE.Vector3(0.24, -0.16, -0.4).applyMatrix4(camera.matrixWorld);
+      // Muzzle point world position
+      let muzzlePos = new THREE.Vector3(0.20, -0.17, -0.42).applyMatrix4(camera.matrixWorld);
+      if (muzzlePoint) {
+        muzzlePos = muzzlePoint.getWorldPosition(new THREE.Vector3());
+      }
+
       let hitPoint = null;
       let isHit = false;
 
@@ -2271,12 +3011,15 @@
           if (zone === 'head') {
             zonePts = 3.0;
             state.headshots++;
+            AudioEngine.playHitHead();
           } else if (zone === 'body') {
             zonePts = 2.0;
             state.bodyHits++;
+            AudioEngine.playHitBody();
           } else {
             zonePts = 1.0;
             state.legHits++;
+            AudioEngine.playHitLegs();
           }
 
           if (isMoving) {
@@ -2296,25 +3039,27 @@
           state.totalHitPoints += zonePts;
           state.totalSpeedPoints += speedPts;
 
-          AudioEngine.playHit(zone);
+          // Kill sound & Kill particle burst
+          AudioEngine.playKill();
+          spawnKillParticles(hitPoint, zone);
 
           // Center Hitmarker
           const hm = document.getElementById('hit-marker');
           hm.style.opacity = '1';
           setTimeout(() => { hm.style.opacity = '0'; }, 80);
 
-          // Floating Score Pop-up projected to screen space
+          // Floating Score Pop-up from pre-allocated pool
           let labelText = '';
           let labelColor = '#ffffff';
           if (zone === 'head') {
             labelText = isMoving ? '+6.000 HEAD ×2' : '+3.000 HEAD';
-            labelColor = '#ffd700'; // Gold
+            labelColor = '#ffd700';
           } else if (zone === 'body') {
             labelText = isMoving ? '+4.000 BODY ×2' : '+2.000 BODY';
-            labelColor = '#5fd3b4'; // Green
+            labelColor = '#5fd3b4';
           } else {
             labelText = isMoving ? '+2.000 LEGS ×2' : '+1.000 LEGS';
-            labelColor = '#38bdf8'; // Blue
+            labelColor = '#38bdf8';
           }
           showScorePopup(hitPoint, labelText, labelColor);
 
@@ -2347,46 +3092,93 @@
       }
 
       spawnBulletTracer(muzzlePos, hitPoint, isHit);
+
+      // --- AIM ERROR & FLICK ANALYSIS ---
+      if (currentTarget && currentTarget.active) {
+        // Target center mass (body center ~1.15m above base)
+        const targetCenter = currentTarget.mesh.position.clone().add(new THREE.Vector3(0, 1.15, 0));
+        const localTarget = targetCenter.clone().applyMatrix4(camera.matrixWorldInverse);
+
+        // Angle in degrees: positive = right, positive = up
+        const horizErrorDeg = THREE.MathUtils.radToDeg(Math.atan2(localTarget.x, -localTarget.z));
+        const vertErrorDeg = THREE.MathUtils.radToDeg(Math.atan2(localTarget.y, -localTarget.z));
+
+        state.totalHorizError += Math.abs(horizErrorDeg);
+        state.totalVertError += Math.abs(vertErrorDeg);
+        state.shotCountForError++;
+
+        // Track flick in last 200ms
+        let netDx = 0;
+        let firstMoveTime = now;
+        for (let i = 0; i < mouseMoveLog.length; i++) {
+          const m = mouseMoveLog[i];
+          if (now - m.time <= 200) {
+            netDx += m.dx;
+            if (m.time < firstMoveTime) firstMoveTime = m.time;
+          }
+        }
+        const flickDuration = now - firstMoveTime;
+
+        if (Math.abs(netDx) >= 10) {
+          state.flickCount++;
+          const flickDir = Math.sign(netDx); // +1 = right, -1 = left
+
+          if (flickDir === 1) {
+            // Flicked right:
+            // If crosshair passed target to right => target is to left of crosshair => horizErrorDeg < -0.5
+            if (horizErrorDeg < -0.5 && flickDuration <= 150) {
+              state.overflickCount++;
+            } else if (horizErrorDeg > 0.5) {
+              // Crosshair fell short => target still to right => horizErrorDeg > 0.5
+              state.underflickCount++;
+            }
+          } else if (flickDir === -1) {
+            // Flicked left:
+            // If crosshair passed target to left => target is to right of crosshair => horizErrorDeg > 0.5
+            if (horizErrorDeg > 0.5 && flickDuration <= 150) {
+              state.overflickCount++;
+            } else if (horizErrorDeg < -0.5) {
+              // Crosshair fell short => target still to left => horizErrorDeg < -0.5
+              state.underflickCount++;
+            }
+          }
+        }
+      }
+
+      // --- PANIC SHOOTING CHECK ---
+      recentShots.push({ time: now, hit: isHit });
+      if (recentShots.length > 8) recentShots.shift();
+
+      const shotsIn1500 = recentShots.filter(s => now - s.time <= 1500);
+      const missesIn1500 = shotsIn1500.filter(s => !s.hit).length;
+
+      if (shotsIn1500.length >= 4 && missesIn1500 >= 3) {
+        if (now - lastPanicBannerTime >= 5000) {
+          lastPanicBannerTime = now;
+          state.panicCount++;
+          showPanicWarning();
+        }
+      }
     }
 
-    function spawnBulletTracer(from, to, isHit) {
-      const dist = from.distanceTo(to);
-      const midpoint = from.clone().add(to).multiplyScalar(0.5);
-      const geo = new THREE.CylinderGeometry(0.012, 0.012, dist, 6);
-      geo.rotateX(Math.PI / 2);
-      const mat = new THREE.MeshBasicMaterial({
-        color: isHit ? 0x5fd3b4 : 0xff5b2e,
-        transparent: true,
-        opacity: 0.95,
-        depthWrite: false
-      });
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.copy(midpoint);
-      mesh.lookAt(to);
-      scene.add(mesh);
-      activeTracers.push({ mesh, birth: performance.now(), durationMs: 120, initialOpacity: 0.95 });
+    function showPanicWarning() {
+      const banner = document.getElementById('panic-warning-banner');
+      banner.classList.add('visible');
+      setTimeout(() => {
+        banner.classList.remove('visible');
+      }, 2000);
     }
 
-    // --- RUN LIFECYCLE & SCORING ---
-    function calculateCurrentScore() {
-      const cfg = MODES[state.mode] || MODES.medium;
-      const accRate = state.shotsFired > 0 ? (state.hits / state.shotsFired) : 1.0;
-      const accPoints = accRate * ACCURACY_POINTS_SCALE;
-      const score = (state.totalHitPoints + state.totalSpeedPoints + accPoints) * cfg.multiplier;
-      return Math.max(0, score);
-    }
-
-    function updateHUD() {
-      const score = calculateCurrentScore();
-      document.getElementById('hud-score').textContent = score.toFixed(3);
-      document.getElementById('hud-target-idx').textContent = `${Math.min(TOTAL_RUN_TARGETS, state.currentTargetIndex)} / ${TOTAL_RUN_TARGETS}`;
-      document.getElementById('hud-misses').textContent = state.misses;
-    }
-
+    // --- RUN LIFECYCLE ---
     function startRun() {
       AudioEngine.init();
+      document.getElementById('start-overlay').classList.add('hidden');
+      document.getElementById('results-overlay').classList.add('hidden');
+      document.getElementById('pause-overlay').classList.add('hidden');
+
       state.isRunning = true;
       state.currentTargetIndex = 0;
+      state.runStartTime = performance.now();
       state.shotsFired = 0;
       state.hits = 0;
       state.misses = 0;
@@ -2398,53 +3190,123 @@
       state.totalHitPoints = 0;
       state.totalSpeedPoints = 0;
       state.targetHistory = [];
-      state.runStartTime = performance.now();
 
-      loadActiveMap(state.map);
-
-      document.getElementById('start-overlay').classList.add('hidden');
-      document.getElementById('pause-overlay').classList.add('hidden');
-      document.getElementById('results-overlay').classList.add('hidden');
+      state.flickCount = 0;
+      state.overflickCount = 0;
+      state.underflickCount = 0;
+      state.totalHorizError = 0;
+      state.totalVertError = 0;
+      state.shotCountForError = 0;
+      state.panicCount = 0;
+      recentShots.length = 0;
 
       updateHUD();
+      loadActiveMap(state.map);
       spawnNextTarget();
 
-      document.getElementById('game-canvas').requestPointerLock();
+      const canvas = document.getElementById('game-canvas');
+      canvas.requestPointerLock();
+    }
+
+    function restartRun() {
+      startRun();
+    }
+
+    function resumeRun() {
+      document.getElementById('pause-overlay').classList.add('hidden');
+      const canvas = document.getElementById('game-canvas');
+      canvas.requestPointerLock();
+    }
+
+    function updateHUD() {
+      const cfg = MODES[state.mode] || MODES.medium;
+      const currentScore = (state.totalHitPoints + state.totalSpeedPoints) * cfg.multiplier;
+      document.getElementById('hud-score').textContent = currentScore.toFixed(3);
+      document.getElementById('hud-target-idx').textContent = `${state.currentTargetIndex} / ${TOTAL_RUN_TARGETS}`;
+      document.getElementById('hud-misses').textContent = state.misses;
     }
 
     function finishRun() {
       state.isRunning = false;
+      if (currentTarget) {
+        currentTarget.destroy();
+        currentTarget = null;
+      }
       document.exitPointerLock();
 
-      const finalScore = calculateCurrentScore();
-      const rank = getRank(finalScore);
-      const totalTimeSec = ((performance.now() - state.runStartTime) / 1000).toFixed(1);
+      const cfg = MODES[state.mode] || MODES.medium;
+      const finalScore = (state.totalHitPoints + state.totalSpeedPoints) * cfg.multiplier;
       const accPct = state.shotsFired > 0 ? ((state.hits / state.shotsFired) * 100).toFixed(1) : '0.0';
 
-      const hitsList = state.targetHistory.filter(t => t.hit);
-      let avgReact = 0;
-      let fastestReact = 0;
-      if (hitsList.length > 0) {
-        const sum = hitsList.reduce((acc, cur) => acc + cur.reactionMs, 0);
-        avgReact = Math.round(sum / hitsList.length);
-        fastestReact = Math.min(...hitsList.map(t => t.reactionMs));
-      }
+      const reactTimes = state.targetHistory.filter(t => t.hit).map(t => t.reactionMs);
+      const avgReact = reactTimes.length > 0 ? Math.round(reactTimes.reduce((a, b) => a + b, 0) / reactTimes.length) : 0;
+      const fastestReact = reactTimes.length > 0 ? Math.min(...reactTimes) : 0;
 
-      const cfg = MODES[state.mode] || MODES.medium;
-
-      // Fill Results Screen
+      // Populate Hero & Rank
       document.getElementById('res-score-val').textContent = finalScore.toFixed(3);
-      document.getElementById('res-rank-val').textContent = rank.name;
+      let rank = 'BEGINNER I';
+      if (finalScore >= 180) rank = 'RADIANT';
+      else if (finalScore >= 140) rank = 'IMMORTAL';
+      else if (finalScore >= 100) rank = 'ASCENDANT';
+      else if (finalScore >= 70) rank = 'DIAMOND';
+      else if (finalScore >= 45) rank = 'PLATINUM';
+      else if (finalScore >= 25) rank = 'GOLD';
+      document.getElementById('res-rank-val').textContent = rank;
 
       document.getElementById('res-hit-pts').textContent = state.totalHitPoints.toFixed(3);
       document.getElementById('res-speed-avg').textContent = `${avgReact} ms (fast: ${fastestReact} ms)`;
       document.getElementById('res-acc-rate').textContent = `${accPct}% (${state.hits}/${state.shotsFired})`;
       document.getElementById('res-mult-val').textContent = `${cfg.name} (×${cfg.multiplier})`;
 
+      // Aim Analysis Details
+      const totalFlicks = state.flickCount;
+      document.getElementById('analysis-flick-total').textContent = `${totalFlicks} Flicks Analyzed`;
+
+      const overPct = totalFlicks > 0 ? ((state.overflickCount / totalFlicks) * 100).toFixed(1) : '0.0';
+      const underPct = totalFlicks > 0 ? ((state.underflickCount / totalFlicks) * 100).toFixed(1) : '0.0';
+      document.getElementById('analysis-overflick-val').textContent = `${state.overflickCount} (${overPct}%)`;
+      document.getElementById('analysis-underflick-val').textContent = `${state.underflickCount} (${underPct}%)`;
+
+      const avgH = state.shotCountForError > 0 ? (state.totalHorizError / state.shotCountForError).toFixed(2) : '0.00';
+      const avgV = state.shotCountForError > 0 ? (state.totalVertError / state.shotCountForError).toFixed(2) : '0.00';
+      document.getElementById('analysis-avg-error-val').textContent = `H: ${avgH}° / V: ${avgV}°`;
+      document.getElementById('analysis-panic-val').textContent = state.panicCount;
+
+      // EDPI Suggestion
+      const edpiContainer = document.getElementById('edpi-suggestion-container');
+      if (totalFlicks >= 10) {
+        const uPctNum = parseFloat(underPct);
+        const oPctNum = parseFloat(overPct);
+        const scaleFactor = Math.max(0.85, Math.min(1.15, 1.0 + (uPctNum - oPctNum) / 200.0));
+        const suggestedSens = parseFloat((state.sens * scaleFactor).toFixed(3));
+        const currentEDPI = (state.dpi * state.sens).toFixed(1);
+        const suggestedEDPI = (state.dpi * suggestedSens).toFixed(1);
+        const suggestedCm = getCm360(suggestedSens, state.dpi).toFixed(1);
+
+        edpiContainer.innerHTML = `
+          <div class="edpi-info">
+            <span class="edpi-title">Sensitivity Optimization Suggestion</span>
+            <span class="edpi-comparison">
+              Current: <strong>${state.sens.toFixed(3)}</strong> (${currentEDPI} eDPI) &rarr; Suggested: <strong style="color:var(--accent-2)">${suggestedSens.toFixed(3)}</strong> (${suggestedEDPI} eDPI &bull; ${suggestedCm} cm/360)
+            </span>
+          </div>
+          <div class="edpi-actions">
+            <button class="btn-apply-sens" onclick="applySuggestedSens(${suggestedSens})">Apply Suggestion</button>
+            <button class="btn-dismiss-sens" onclick="dismissSuggestedSens()">Keep Current</button>
+          </div>
+        `;
+      } else {
+        edpiContainer.innerHTML = `
+          <div class="edpi-info">
+            <span class="edpi-title">Sensitivity Optimization Suggestion</span>
+            <span style="color:var(--muted); font-size:12px;">Need 10 flicks for a suggestion (${totalFlicks}/10 recorded).</span>
+          </div>
+        `;
+      }
+
       // 30-cell grid
       const gridContainer = document.getElementById('target-grid-cells');
       gridContainer.innerHTML = '';
-
       state.targetHistory.forEach(t => {
         const cell = document.createElement('div');
         cell.className = `grid-cell ${t.hit ? t.zone : 'miss'}`;
@@ -2459,8 +3321,8 @@
       saveRunRecord({
         date: new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
         map: state.map.toUpperCase(),
+        dist: `${state.distance}m`,
         mode: cfg.name,
-        weapon: WEAPONS[state.weapon].name,
         score: finalScore.toFixed(3),
         hits: `${state.hits}/30`,
         headshots: state.headshots,
@@ -2471,9 +3333,23 @@
       document.getElementById('results-overlay').classList.remove('hidden');
     }
 
-    function resumeRun() {
-      document.getElementById('pause-overlay').classList.add('hidden');
-      document.getElementById('game-canvas').requestPointerLock();
+    function applySuggestedSens(newSens) {
+      onSensChange(newSens, true);
+      const edpiContainer = document.getElementById('edpi-suggestion-container');
+      edpiContainer.innerHTML = `
+        <span style="color:var(--accent-2); font-weight:700; font-family:'JetBrains Mono'; font-size:12px;">
+          Applied sensitivity ${newSens.toFixed(3)}! Persisted to settings.
+        </span>
+      `;
+    }
+
+    function dismissSuggestedSens() {
+      const edpiContainer = document.getElementById('edpi-suggestion-container');
+      edpiContainer.innerHTML = `
+        <span style="color:var(--muted); font-size:12px; font-family:'JetBrains Mono';">
+          Kept current sensitivity (${state.sens.toFixed(3)}).
+        </span>
+      `;
     }
 
     function quitToMenu() {
@@ -2485,14 +3361,14 @@
       renderHistoryTable();
     }
 
-    // --- RUN HISTORY (PERSISTENCE & RENDERING) ---
+    // --- RUN HISTORY ---
     function saveRunRecord(record) {
       try {
         const raw = localStorage.getItem('vat_history');
         let history = raw ? JSON.parse(raw) : [];
         if (!Array.isArray(history)) history = [];
         history.unshift(record);
-        if (history.length > 8) history = history.slice(0, 8); // Last 8 runs
+        if (history.length > 8) history = history.slice(0, 8);
         localStorage.setItem('vat_history', JSON.stringify(history));
       } catch (e) {}
     }
@@ -2511,8 +3387,8 @@
           <tr>
             <td>${r.date || '—'}</td>
             <td>${r.map || '—'}</td>
+            <td>${r.dist || '—'}</td>
             <td>${r.mode || '—'}</td>
-            <td>${r.weapon || '—'}</td>
             <td class="primary-col">${r.score !== undefined ? r.score : '—'}</td>
             <td>${r.hits || '—'}</td>
             <td>${r.headshots !== undefined ? r.headshots : '—'}</td>
@@ -2532,21 +3408,7 @@
       }
     }
 
-    // Target Color Setting
-    function onTargetColorChange(hex) {
-      state.targetColor = hex;
-      const picker = document.getElementById('target-color-picker');
-      if (picker) picker.value = hex;
-      document.querySelectorAll('.target-color-btn').forEach(b => {
-        b.classList.toggle('active', b.dataset.color.toLowerCase() === hex.toLowerCase());
-      });
-      if (currentTarget && currentTarget.active) {
-        currentTarget.updateColor();
-      }
-      saveSettings();
-    }
-
-    // --- CROSSHAIR BUILDER & VALORANT CODE IMPORTER ---
+    // --- CROSSHAIR BUILDER, PRESETS & IMPORTER (RENDERED ONCE, STYLE PROPERTIES UPDATED) ---
     const CROSSHAIR_PRESETS = {
       dot: {
         outline: { enabled: true, thickness: 1, opacity: 1.0 },
@@ -2626,7 +3488,6 @@
       const cx = cvs.width / 2;
       const cy = cvs.height / 2;
 
-      // Color parsing with opacity
       function parseColor(hex, alpha) {
         if (!hex || !hex.startsWith('#')) return `rgba(0,255,136,${alpha})`;
         let c = hex.substring(1);
@@ -2672,13 +3533,11 @@
         return;
       }
 
-      // Center Dot
       if (ch.centerDot.enabled) {
         const sz = ch.centerDot.size;
         drawRect(cx - sz / 2, cy - sz / 2, sz, sz);
       }
 
-      // Helper for 4-way crosshair lines
       function drawLines(lines) {
         if (!lines || !lines.enabled) return;
         const len = lines.length;
@@ -2686,14 +3545,10 @@
         const gap = lines.gap;
         const halfThick = Math.floor(thick / 2);
 
-        // Top
-        drawRect(cx - halfThick, cy - gap - len, thick, len);
-        // Bottom
-        drawRect(cx - halfThick, cy + gap, thick, len);
-        // Left
-        drawRect(cx - gap - len, cy - halfThick, len, thick);
-        // Right
-        drawRect(cx + gap, cy - halfThick, len, thick);
+        drawRect(cx - halfThick, cy - gap - len, thick, len); // Top
+        drawRect(cx - halfThick, cy + gap, thick, len);       // Bottom
+        drawRect(cx - gap - len, cy - halfThick, len, thick); // Left
+        drawRect(cx + gap, cy - halfThick, len, thick);       // Right
       }
 
       drawLines(ch.outer);
@@ -2777,7 +3632,6 @@
       document.getElementById('crosshair-sheet').classList.remove('open');
     }
 
-        // Valorant Code Importer (Primary Section only, Never Crash)
     function applyValorantCrosshairCode() {
       const codeInput = document.getElementById('val-code-input').value.trim();
       const statusEl = document.getElementById('code-status-msg');
@@ -2790,16 +3644,14 @@
 
       try {
         const parts = codeInput.split(';').filter(p => p.length > 0);
-        let section = 'P';
         let i = 0;
-
-        // Temporary target clone
         const ch = JSON.parse(JSON.stringify(state.crosshair));
+        ch.shape = 'default';
         const colorPalette = ['#ffffff', '#00ff00', '#7fff00', '#d4ff00', '#ffff00', '#00ffff', '#ff00aa', '#ff0000'];
 
         while (i < parts.length) {
           const tok = parts[i];
-          if (tok === 'S') break; // Ignore secondary section completely
+          if (tok === 'S') break;
           if (tok === 'P') { i++; continue; }
 
           const next = parts[i + 1];
@@ -2877,63 +3729,12 @@
       }
     }
 
-    // --- VIEWMODEL & THREE.JS SETUP ---
-    let weaponGroup = null;
+    // --- THREE.JS INITIALIZATION ---
+    let scene, camera, renderer, raycaster;
+    let currentTarget = null;
+    const environmentColliders = [];
+    const activeHitboxes = [];
 
-    function setupWeaponViewModel() {
-      weaponGroup = new THREE.Group();
-      camera.add(weaponGroup);
-      scene.add(camera);
-      buildWeaponModel(state.weapon);
-    }
-
-    function buildWeaponModel(type) {
-      while (weaponGroup.children.length > 0) {
-        weaponGroup.remove(weaponGroup.children[0]);
-      }
-
-      const darkMat = new THREE.MeshStandardMaterial({ color: 0x161512, roughness: 0.4, metalness: 0.8 });
-      const bodyMat = new THREE.MeshStandardMaterial({ color: 0x24221d, roughness: 0.35, metalness: 0.7 });
-
-      if (type === 'sheriff') {
-        const frame = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.12, 0.28), darkMat);
-        weaponGroup.add(frame);
-        const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.10, 12), bodyMat);
-        cyl.rotation.x = Math.PI / 2;
-        cyl.position.set(0, 0.01, -0.02);
-        weaponGroup.add(cyl);
-        const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.06, 0.16), darkMat);
-        barrel.position.set(0, 0.025, -0.18);
-        weaponGroup.add(barrel);
-      } else if (type === 'guardian') {
-        const body = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.11, 0.52), bodyMat);
-        weaponGroup.add(body);
-        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.24, 12), darkMat);
-        barrel.rotation.x = Math.PI / 2;
-        barrel.position.set(0, 0.02, -0.34);
-        weaponGroup.add(barrel);
-        const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.20, 12), darkMat);
-        scope.rotation.x = Math.PI / 2;
-        scope.position.set(0, 0.09, -0.05);
-        weaponGroup.add(scope);
-      } else {
-        // Vandal
-        const body = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 0.48), bodyMat);
-        weaponGroup.add(body);
-        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.18, 12), darkMat);
-        barrel.rotation.x = Math.PI / 2;
-        barrel.position.set(0, 0.02, -0.32);
-        weaponGroup.add(barrel);
-        const mag = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.18, 0.09), darkMat);
-        mag.rotation.x = 0.22;
-        mag.position.set(0, -0.13, -0.06);
-        weaponGroup.add(mag);
-      }
-
-      weaponGroup.position.set(0.32, -0.26, -0.55);
-    }
-
-    // Camera FOV locking horizontal FOV at 103 deg
     function updateCameraFOV() {
       const aspect = window.innerWidth / window.innerHeight;
       const hfovRad = THREE.MathUtils.degToRad(state.currentHfovDeg);
@@ -2943,19 +3744,11 @@
       camera.updateProjectionMatrix();
     }
 
-    let scene, camera, renderer, raycaster;
-    let currentTarget = null;
-    const environmentColliders = [];
-    const activeHitboxes = [];
-    const activeTracers = [];
-
     function initThree() {
       const canvas = document.getElementById('game-canvas');
       scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x0e0d0b);
-      scene.fog = new THREE.FogExp2(0x0e0d0b, 0.016);
 
-      camera = new THREE.PerspectiveCamera(70.53, window.innerWidth / window.innerHeight, 0.1, 150);
+      camera = new THREE.PerspectiveCamera(70.53, window.innerWidth / window.innerHeight, 0.1, 200);
       camera.position.copy(state.playerPos);
 
       renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -2966,21 +3759,22 @@
 
       raycaster = new THREE.Raycaster();
 
-      // Lighting
-      const hemi = new THREE.HemisphereLight(0xffffff, 0x14120e, 0.65);
+      // Lighting: Bright HemisphereLight (sky + ground) + DirectionalLight with shadows
+      const hemi = new THREE.HemisphereLight(0xe8ecf2, 0x3a3832, 0.85);
       scene.add(hemi);
-      const sun = new THREE.DirectionalLight(0xffffff, 0.85);
-      sun.position.set(10, 20, 15);
+
+      const sun = new THREE.DirectionalLight(0xffffff, 0.95);
+      sun.position.set(15, 30, 20);
       sun.castShadow = true;
+      sun.shadow.mapSize.width = 1024;
+      sun.shadow.mapSize.height = 1024;
       scene.add(sun);
 
-      // Subtle Rim Light from behind targets (illuminates silhouettes against dark walls)
-      rimLight = new THREE.DirectionalLight(0xffffff, 0.55);
-      rimLight.position.set(0, 3.5, -16);
-      scene.add(rimLight);
-
+      initTracerPool();
+      initParticlePool();
+      initPopupPool();
       setupWeaponViewModel();
-      loadActiveMap('tieryard');
+      loadActiveMap(state.map);
       updateCameraFOV();
       setupEvents();
     }
@@ -2997,14 +3791,14 @@
         return;
       }
 
-      let maxSpeed = 6.75; // Run
+      let maxSpeed = 6.75;
       let targetCameraHeight = 1.7;
 
       if (keys['ControlLeft'] || keys['ControlRight']) {
-        maxSpeed = 2.0; // Crouch
+        maxSpeed = 2.0;
         targetCameraHeight = 1.1;
       } else if (keys['ShiftLeft'] || keys['ShiftRight']) {
-        maxSpeed = 3.375; // Walk
+        maxSpeed = 3.375;
       }
 
       state.playerPos.y += (targetCameraHeight - state.playerPos.y) * Math.min(1.0, 16.0 * dt);
@@ -3016,7 +3810,6 @@
       if (keys['KeyA']) inX -= 1;
       if (keys['KeyD']) inX += 1;
 
-      // Counter-strafe snap: cut velocity immediately when direction flips
       if ((inX > 0 && prevInputX < 0) || (inX < 0 && prevInputX > 0) || (inX === 0 && Math.abs(prevInputX) > 0)) {
         playerVel.x *= 0.15;
       }
@@ -3041,9 +3834,10 @@
 
       state.playerPos.addScaledVector(playerVel, dt);
 
-      // Closed Room Arena bounds (24m x 24m: interior is [-11.4, 11.4])
-      state.playerPos.x = Math.max(-11.4, Math.min(11.4, state.playerPos.x));
-      state.playerPos.z = Math.max(2.0, Math.min(11.4, state.playerPos.z));
+      // Clamped strictly to closed room
+      const halfRoom = currentRoomSize / 2 - 1.2;
+      state.playerPos.x = Math.max(-halfRoom, Math.min(halfRoom, state.playerPos.x));
+      state.playerPos.z = Math.max(halfRoom - 8.0, Math.min(halfRoom, state.playerPos.z));
 
       camera.position.copy(state.playerPos);
     }
@@ -3062,22 +3856,10 @@
             document.exitPointerLock();
           }
         }
-        if (e.code === 'Digit1') setWeapon('vandal');
-        if (e.code === 'Digit2') setWeapon('guardian');
-        if (e.code === 'Digit3') setWeapon('sheriff');
       });
 
       document.addEventListener('keyup', (e) => {
         keys[e.code] = false;
-      });
-
-      document.addEventListener('wheel', (e) => {
-        if (!state.isLocked) return;
-        const weapIds = ['vandal', 'guardian', 'sheriff'];
-        let idx = weapIds.indexOf(state.weapon);
-        if (e.deltaY > 0) idx = (idx + 1) % weapIds.length;
-        else if (e.deltaY < 0) idx = (idx - 1 + weapIds.length) % weapIds.length;
-        setWeapon(weapIds[idx]);
       });
 
       document.addEventListener('pointerlockchange', () => {
@@ -3089,48 +3871,66 @@
 
       document.addEventListener('mousemove', (e) => {
         if (!state.isLocked) return;
-        const deltaYaw = e.movementX * VALORANT_YAW_FACTOR * state.sens;
-        const deltaPitch = e.movementY * VALORANT_YAW_FACTOR * state.sens;
 
-        state.cameraYaw -= THREE.MathUtils.degToRad(deltaYaw);
-        state.cameraPitch -= THREE.MathUtils.degToRad(deltaPitch);
+        // Mouse motion logging for flick analysis
+        const now = performance.now();
+        mouseMoveLog.push({ time: now, dx: e.movementX, dy: e.movementY });
+        while (mouseMoveLog.length > 0 && now - mouseMoveLog[0].time > 350) {
+          mouseMoveLog.shift();
+        }
 
-        const limit = THREE.MathUtils.degToRad(89.5);
-        state.cameraPitch = Math.max(-limit, Math.min(limit, state.cameraPitch));
+        // Valorant Yaw Factor: movementX * 0.07 * sens
+        const yawDeltaDeg = -e.movementX * VALORANT_YAW_FACTOR * state.sens;
+        const pitchDeltaDeg = -e.movementY * VALORANT_YAW_FACTOR * state.sens;
+
+        state.cameraYaw += THREE.MathUtils.degToRad(yawDeltaDeg);
+        state.cameraPitch += THREE.MathUtils.degToRad(pitchDeltaDeg);
+
+        // Clamped pitch: -89 deg to +89 deg
+        const maxPitch = THREE.MathUtils.degToRad(89.0);
+        state.cameraPitch = Math.max(-maxPitch, Math.min(maxPitch, state.cameraPitch));
       });
 
       document.addEventListener('mousedown', (e) => {
-        if (!state.isLocked) return;
+        if (!state.isLocked && state.isRunning) {
+          document.getElementById('game-canvas').requestPointerLock();
+          return;
+        }
+
         if (e.button === 0) {
           isMouseDown = true;
           executeShot();
-          autoFireTimer = 0;
         } else if (e.button === 2) {
-          const w = WEAPONS[state.weapon];
-          if (w.adsZoomDivisor > 1.0) {
-            state.isADS = !state.isADS;
-          }
+          // ADS Toggle
+          state.isADS = !state.isADS;
         }
       });
 
       document.addEventListener('mouseup', (e) => {
-        if (e.button === 0) isMouseDown = false;
+        if (e.button === 0) {
+          isMouseDown = false;
+          autoFireTimer = 0;
+        }
       });
 
-      window.addEventListener('contextmenu', e => e.preventDefault());
+      document.addEventListener('contextmenu', e => e.preventDefault());
     }
 
-    // --- MAIN RENDER LOOP ---
-    let lastTime = performance.now();
+    // --- ANIMATION FRAME LOOP (SINGLE LOOP, CLAMPED DT <= 50ms) ---
+    let lastFrameTime = performance.now();
 
-    function animate() {
+    function animate(now = performance.now()) {
       requestAnimationFrame(animate);
-      const now = performance.now();
-      const dt = Math.min((now - lastTime) / 1000.0, 0.1);
-      lastTime = now;
 
-      // Full auto shooting
-      if (isMouseDown && state.isLocked && state.isRunning) {
+      // Clamp time step to 50ms
+      const rawDt = (now - lastFrameTime) / 1000.0;
+      const dt = Math.min(0.05, Math.max(0.001, rawDt));
+      lastFrameTime = now;
+
+      state.timeSinceLastShot += dt;
+
+      // Full auto continuous firing
+      if (isMouseDown && state.isRunning && state.isLocked) {
         const w = WEAPONS[state.weapon];
         if (w.isFullAuto) {
           autoFireTimer += dt;
@@ -3141,47 +3941,85 @@
         }
       }
 
-      state.timeSinceLastShot += dt;
-      state.cameraRecoilPitch += (0 - state.cameraRecoilPitch) * Math.min(1.0, 14.0 * dt);
-      state.cameraRecoilYaw += (0 - state.cameraRecoilYaw) * Math.min(1.0, 14.0 * dt);
-
-      // Smooth ADS Zoom (~0.1s transition)
+      // Smooth ADS FOV Transition (~0.1s)
       const w = WEAPONS[state.weapon];
-      const targetHfov = (state.isADS && w.adsZoomDivisor > 1.0) ? (HORIZONTAL_BASE_FOV_DEG / w.adsZoomDivisor) : HORIZONTAL_BASE_FOV_DEG;
+      const targetHfov = state.isADS ? (103.0 / w.adsZoomDivisor) : 103.0;
       state.currentHfovDeg += (targetHfov - state.currentHfovDeg) * Math.min(1.0, 18.0 * dt);
       updateCameraFOV();
 
-      // Camera rotation
-      camera.rotation.set(0, 0, 0);
-      camera.rotation.order = 'YXZ';
-      camera.rotation.y = state.cameraYaw + state.cameraRecoilYaw;
-      camera.rotation.x = state.cameraPitch + state.cameraRecoilPitch;
-
-      updatePlayerMovement(dt);
-
+      // Viewmodel Recoil Recovery
       if (weaponGroup) {
-        const targetViewZ = state.isADS ? -0.48 : -0.55;
-        const targetViewX = state.isADS ? 0.08 : 0.32;
-        weaponGroup.position.z += (targetViewZ - weaponGroup.position.z) * 14.0 * dt;
-        weaponGroup.position.x += (targetViewX - weaponGroup.position.x) * 14.0 * dt;
-        weaponGroup.rotation.x += (0 - weaponGroup.rotation.x) * 14.0 * dt;
+        const targetViewZ = state.isADS ? -0.32 : -0.38;
+        const targetViewX = state.isADS ? 0.00 : 0.20;
+        weaponGroup.position.z += (targetViewZ - weaponGroup.position.z) * Math.min(1.0, 16.0 * dt);
+        weaponGroup.position.x += (targetViewX - weaponGroup.position.x) * Math.min(1.0, 16.0 * dt);
+        weaponGroup.rotation.x += (0 - weaponGroup.rotation.x) * Math.min(1.0, 16.0 * dt);
       }
 
-      if (currentTarget) {
+      // Camera Recoil Recovery
+      state.cameraRecoilPitch = Math.max(0, state.cameraRecoilPitch - dt * 0.28);
+      state.cameraRecoilYaw *= Math.max(0, 1.0 - dt * 10.0);
+
+      // Apply camera rotation (Do NOT reset yaw/pitch)
+      const effPitch = state.cameraPitch + state.cameraRecoilPitch;
+      const effYaw = state.cameraYaw + state.cameraRecoilYaw;
+      camera.quaternion.setFromEuler(new THREE.Euler(effPitch, effYaw, 0, 'YXZ'));
+
+      // Player Movement
+      updatePlayerMovement(dt);
+
+      // Active Target Update
+      if (currentTarget && currentTarget.active) {
         currentTarget.update(dt);
       }
 
-      // Tracers update
-      for (let i = activeTracers.length - 1; i >= 0; i--) {
-        const t = activeTracers[i];
-        const age = now - t.birth;
-        if (age >= t.durationMs) {
-          scene.remove(t.mesh);
-          t.mesh.geometry.dispose();
-          t.mesh.material.dispose();
-          activeTracers.splice(i, 1);
-        } else {
-          t.mesh.material.opacity = t.initialOpacity * (1.0 - age / t.durationMs);
+      // Active Tracers Pool Update
+      for (let i = 0; i < tracerPool.length; i++) {
+        const tr = tracerPool[i];
+        if (tr.active) {
+          const age = now - tr.birth;
+          if (age >= tr.durationMs) {
+            tr.active = false;
+            tr.mesh.visible = false;
+          } else {
+            const prog = age / tr.durationMs;
+            tr.mesh.material.opacity = (1.0 - prog) * 0.95;
+          }
+        }
+      }
+
+      // Active Kill Particles Pool Update
+      for (let i = 0; i < particlePool.length; i++) {
+        const p = particlePool[i];
+        if (p.active) {
+          const age = now - p.birth;
+          if (age >= p.durationMs) {
+            p.active = false;
+            p.mesh.visible = false;
+          } else {
+            const prog = age / p.durationMs;
+            p.mesh.position.addScaledVector(p.vel, dt);
+            p.vel.y -= 9.8 * dt; // Gravity
+            p.mesh.scale.setScalar(Math.max(0.01, 1.0 - prog));
+            p.mesh.material.opacity = (1.0 - prog);
+          }
+        }
+      }
+
+      // Active Popups Pool Update
+      for (let i = 0; i < popupPool.length; i++) {
+        const slot = popupPool[i];
+        if (slot.active) {
+          const age = now - slot.startTime;
+          if (age >= slot.duration) {
+            slot.active = false;
+            slot.el.style.display = 'none';
+          } else {
+            const prog = age / slot.duration;
+            const currY = slot.startY - prog * 40;
+            slot.el.style.top = `${Math.round(currY)}px`;
+            slot.el.style.opacity = (1.0 - prog).toFixed(2);
+          }
         }
       }
 
@@ -3195,9 +4033,12 @@
           sens: state.sens,
           dpi: state.dpi,
           mode: state.mode,
+          distance: state.distance,
           map: state.map,
           weapon: state.weapon,
           strafe: state.strafeEnabled,
+          soundEnabled: state.soundEnabled,
+          soundVolume: state.soundVolume,
           targetColor: state.targetColor,
           crosshair: state.crosshair
         };
@@ -3213,11 +4054,20 @@
           if (d.sens) onSensChange(d.sens, true);
           if (d.dpi) onDpiChange(d.dpi, true);
           if (d.mode) setMode(d.mode);
+          if (d.distance) setDistance(d.distance);
           if (d.map) setMap(d.map);
           if (d.weapon) setWeapon(d.weapon);
           if (d.strafe !== undefined) {
             state.strafeEnabled = !!d.strafe;
             document.getElementById('strafe-toggle').checked = state.strafeEnabled;
+          }
+          if (d.soundEnabled !== undefined) {
+            state.soundEnabled = !!d.soundEnabled;
+            document.getElementById('sound-toggle').checked = state.soundEnabled;
+          }
+          if (d.soundVolume !== undefined) {
+            state.soundVolume = parseFloat(d.soundVolume);
+            document.getElementById('sound-volume').value = state.soundVolume;
           }
           if (d.targetColor) onTargetColorChange(d.targetColor);
           if (d.crosshair) state.crosshair = Object.assign(state.crosshair, d.crosshair);
